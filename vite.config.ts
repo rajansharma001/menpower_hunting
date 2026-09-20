@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileDbPlugin } from './vite-plugin-file-db';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), fileDbPlugin()],
   build: {
     chunkSizeWarningLimit: 800,
     rollupOptions: {

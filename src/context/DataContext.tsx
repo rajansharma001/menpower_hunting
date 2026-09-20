@@ -161,25 +161,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('Follow-up removed.', 'info');
   };
 
-  const resetDemoData = () => {
+  const resetDemoData = async () => {
     if (!user) return;
-    db.loadDemoData(user.id);
-    refreshData();
+    await db.loadDemoData(user.id);
+    await refreshData();
     showToast('Demo data reloaded.', 'info');
   };
 
-  const purgeDemoData = () => {
+  const purgeDemoData = async () => {
     if (!user) return;
-    db.clearDemoData(user.id);
-    refreshData();
+    await db.clearDemoData(user.id);
+    await refreshData();
     showToast('Demo data removed.', 'info');
   };
 
-  const purgeAllData = () => {
+  const purgeAllData = async () => {
     if (!user) return;
-    db.clearAllData(user.id);
-    refreshData();
-    showToast('All records cleared.', 'warning');
+    await db.clearAllData(user.id);
+    await refreshData();
+    showToast('All records cleared from file.', 'warning');
   };
 
   return (

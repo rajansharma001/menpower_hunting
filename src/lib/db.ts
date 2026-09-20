@@ -8,52 +8,87 @@ import {
   VerificationItem,
   FollowUp,
   OpportunityComplete,
-  VerificationStatus,
-  FollowUpStatus
 } from '../types/database';
 import { WizardFormData } from '../types/form';
 import { getSupabase } from './supabase';
 import { generateDemoData } from './demoData';
 import { DEFAULT_VERIFICATION_ITEMS } from '../constants/workflowOptions';
 
-const STORAGE_KEYS = {
-  AGENCIES: 'mph_agencies',
-  VISITS: 'mph_visits',
-  OPPORTUNITIES: 'mph_opportunities',
-  COSTS: 'mph_costs',
-  DOCUMENTS: 'mph_documents',
-  PAYMENT_TERMS: 'mph_payment_terms',
-  VERIFICATION_ITEMS: 'mph_verification_items',
-  FOLLOW_UPS: 'mph_follow_ups',
-  IS_INITIALIZED: 'mph_is_initialized'
+export interface FileDatabase {
+  agencies: Agency[];
+  visits: Visit[];
+  opportunities: Opportunity[];
+  costs: OpportunityCost[];
+  documents: OpportunityDocument[];
+  payment_terms: PaymentTerm[];
+  verification_items: VerificationItem[];
+  follow_ups: FollowUp[];
+}
+
+let cachedDb: FileDatabase = {
+  agencies: [],
+  visits: [],
+  opportunities: [],
+  costs: [],
+  documents: [],
+  payment_terms: [],
+  verification_items: [],
+  follow_ups: []
 };
 
-function readLocal<T>(key: string): T[] {
+let isLoadedFromFile = false;
+
+// Fetch directly from server disk file (data/db.json)
+export async function fetchFileDatabase(): Promise<FileDatabase> {
   try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error(`Error reading ${key} from localStorage`, e);
-    return [];
+    const res = await fetch('/api/db');
+    if (res.ok) {
+      const data = await res.json();
+      cachedDb = {
+        agencies: Array.isArray(data.agencies) ? data.agencies : [],
+        visits: Array.isArray(data.visits) ? data.visits : [],
+        opportunities: Array.isArray(data.opportunities) ? data.opportunities : [],
+        costs: Array.isArray(data.costs) ? data.costs : [],
+        documents: Array.isArray(data.documents) ? data.documents : [],
+        payment_terms: Array.isArray(data.payment_terms) ? data.payment_terms : [],
+        verification_items: Array.isArray(data.verification_items) ? data.verification_items : [],
+        follow_ups: Array.isArray(data.follow_ups) ? data.follow_ups : []
+      };
+      isLoadedFromFile = true;
+      return cachedDb;
+    }
+  } catch (err) {
+    console.warn('Could not read from /api/db file endpoint', err);
+  }
+  return cachedDb;
+}
+
+// Write directly to server disk file (data/db.json)
+export async function saveToFileDisk(data: FileDatabase): Promise<boolean> {
+  cachedDb = data;
+  try {
+    const res = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data, null, 2)
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to write to file data/db.json', err);
+    return false;
   }
 }
 
-function writeLocal<T>(key: string, data: T[]): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    console.error(`Error writing ${key} to localStorage`, e);
+async function ensureDataLoaded(): Promise<FileDatabase> {
+  if (!isLoadedFromFile) {
+    return await fetchFileDatabase();
   }
+  return cachedDb;
 }
 
-// Mark local database initialized and wipe previous demo data
 export function initializeLocalDatabase(userId: string) {
-  const resetFlag = 'mph_cleared_previous_v2';
-  if (!localStorage.getItem(resetFlag)) {
-    clearAllData();
-    localStorage.setItem(resetFlag, 'true');
-  }
-  localStorage.setItem(`${STORAGE_KEYS.IS_INITIALIZED}_${userId}`, 'true');
+  // Trigger initial fetch from file on disk
+  fetchFileDatabase();
 }
 
 export async function getAgencies(userId: string): Promise<Agency[]> {
@@ -66,12 +101,12 @@ export async function getAgencies(userId: string): Promise<Agency[]> {
         .order('name', { ascending: true });
       if (!error && data) return data as Agency[];
     } catch (err) {
-      console.warn('Falling back to local storage for getAgencies', err);
+      console.warn('Falling back to file database for getAgencies', err);
     }
   }
 
-  const list = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  return list.filter(a => a.user_id === userId);
+  const db = await ensureDataLoaded();
+  return db.agencies.filter(a => !userId || a.user_id === userId);
 }
 
 export async function createAgency(agencyData: Omit<Agency, 'id' | 'created_at' | 'updated_at'>): Promise<Agency> {
@@ -87,7 +122,7 @@ export async function createAgency(agencyData: Omit<Agency, 'id' | 'created_at' 
         .single();
       if (!error && data) return data as Agency;
     } catch (err) {
-      console.warn('Falling back to local storage for createAgency', err);
+      console.warn('Falling back to file database for createAgency', err);
     }
   }
 
@@ -98,9 +133,9 @@ export async function createAgency(agencyData: Omit<Agency, 'id' | 'created_at' 
     updated_at: now,
   };
 
-  const list = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  list.unshift(newAgency);
-  writeLocal(STORAGE_KEYS.AGENCIES, list);
+  const db = await ensureDataLoaded();
+  db.agencies.unshift(newAgency);
+  await saveToFileDisk(db);
   return newAgency;
 }
 
@@ -118,16 +153,16 @@ export async function updateAgency(id: string, updates: Partial<Agency>): Promis
         .single();
       if (!error && data) return data as Agency;
     } catch (err) {
-      console.warn('Falling back to local storage for updateAgency', err);
+      console.warn('Falling back to file database for updateAgency', err);
     }
   }
 
-  const list = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  const idx = list.findIndex(a => a.id === id);
+  const db = await ensureDataLoaded();
+  const idx = db.agencies.findIndex(a => a.id === id);
   if (idx !== -1) {
-    list[idx] = { ...list[idx], ...updates, updated_at: now };
-    writeLocal(STORAGE_KEYS.AGENCIES, list);
-    return list[idx];
+    db.agencies[idx] = { ...db.agencies[idx], ...updates, updated_at: now };
+    await saveToFileDisk(db);
+    return db.agencies[idx];
   }
   return null;
 }
@@ -139,19 +174,14 @@ export async function deleteAgency(id: string): Promise<boolean> {
       const { error } = await supabase.from('agencies').delete().eq('id', id);
       if (!error) return true;
     } catch (err) {
-      console.warn('Falling back to local storage for deleteAgency', err);
+      console.warn('Falling back to file database for deleteAgency', err);
     }
   }
 
-  let list = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  list = list.filter(a => a.id !== id);
-  writeLocal(STORAGE_KEYS.AGENCIES, list);
-
-  // Cascade delete opportunities associated with this agency
-  let opps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  opps = opps.filter(o => o.agency_id !== id);
-  writeLocal(STORAGE_KEYS.OPPORTUNITIES, opps);
-
+  const db = await ensureDataLoaded();
+  db.agencies = db.agencies.filter(a => a.id !== id);
+  db.opportunities = db.opportunities.filter(o => o.agency_id !== id);
+  await saveToFileDisk(db);
   return true;
 }
 
@@ -168,7 +198,7 @@ export async function createVisit(visitData: Omit<Visit, 'id' | 'created_at' | '
         .single();
       if (!error && data) return data as Visit;
     } catch (err) {
-      console.warn('Falling back to local storage for createVisit', err);
+      console.warn('Falling back to file database for createVisit', err);
     }
   }
 
@@ -179,9 +209,9 @@ export async function createVisit(visitData: Omit<Visit, 'id' | 'created_at' | '
     updated_at: now,
   };
 
-  const list = readLocal<Visit>(STORAGE_KEYS.VISITS);
-  list.unshift(newVisit);
-  writeLocal(STORAGE_KEYS.VISITS, list);
+  const db = await ensureDataLoaded();
+  db.visits.unshift(newVisit);
+  await saveToFileDisk(db);
   return newVisit;
 }
 
@@ -195,12 +225,12 @@ export async function getVisits(userId: string): Promise<Visit[]> {
         .order('visit_date', { ascending: false });
       if (!error && data) return data as Visit[];
     } catch (err) {
-      console.warn('Falling back to local storage for getVisits', err);
+      console.warn('Falling back to file database for getVisits', err);
     }
   }
 
-  const list = readLocal<Visit>(STORAGE_KEYS.VISITS);
-  return list.filter(v => v.user_id === userId);
+  const db = await ensureDataLoaded();
+  return db.visits.filter(v => !userId || v.user_id === userId);
 }
 
 export async function getOpportunities(userId: string): Promise<OpportunityComplete[]> {
@@ -220,7 +250,7 @@ export async function getOpportunities(userId: string): Promise<OpportunityCompl
           follow_ups:follow_ups(*)
         `)
         .order('created_at', { ascending: false });
-      
+
       if (!error && opps) {
         return opps.map((o: any) => ({
           ...o,
@@ -228,86 +258,28 @@ export async function getOpportunities(userId: string): Promise<OpportunityCompl
         })) as OpportunityComplete[];
       }
     } catch (err) {
-      console.warn('Falling back to local storage for getOpportunities', err);
+      console.warn('Falling back to file database for getOpportunities', err);
     }
   }
 
-  const opps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES).filter(o => o.user_id === userId);
-  const agencies = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  const visits = readLocal<Visit>(STORAGE_KEYS.VISITS);
-  const costs = readLocal<OpportunityCost>(STORAGE_KEYS.COSTS);
-  const documents = readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS);
-  const paymentTerms = readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS);
-  const verificationItems = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  const followUps = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
+  const db = await ensureDataLoaded();
+  const opps = db.opportunities.filter(o => !userId || o.user_id === userId);
 
   return opps.map(opp => ({
     ...opp,
-    agency: agencies.find(a => a.id === opp.agency_id),
-    visit: visits.find(v => v.id === opp.visit_id),
-    costs: costs.find(c => c.opportunity_id === opp.id),
-    documents: documents.filter(d => d.opportunity_id === opp.id),
-    payment_terms: paymentTerms.filter(p => p.opportunity_id === opp.id),
-    verification_items: verificationItems.filter(v => v.opportunity_id === opp.id),
-    follow_ups: followUps.filter(f => f.opportunity_id === opp.id)
+    agency: db.agencies.find(a => a.id === opp.agency_id),
+    visit: db.visits.find(v => v.id === opp.visit_id),
+    costs: db.costs.find(c => c.opportunity_id === opp.id),
+    documents: db.documents.filter(d => d.opportunity_id === opp.id),
+    payment_terms: db.payment_terms.filter(p => p.opportunity_id === opp.id),
+    verification_items: db.verification_items.filter(v => v.opportunity_id === opp.id),
+    follow_ups: db.follow_ups.filter(f => f.opportunity_id === opp.id)
   }));
 }
 
 export async function getOpportunity(id: string): Promise<OpportunityComplete | null> {
   const opps = await getOpportunities('');
-  // When calling getOpportunities locally or in supabase, find by ID
-  const allOpps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  const opp = allOpps.find(o => o.id === id);
-  if (!opp) {
-    // If not found in local, check via supabase
-    const supabase = getSupabase();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('opportunities')
-          .select(`
-            *,
-            agency:agencies(*),
-            visit:visits(*),
-            costs:opportunity_costs(*),
-            documents:opportunity_documents(*),
-            payment_terms:payment_terms(*),
-            verification_items:verification_items(*),
-            follow_ups:follow_ups(*)
-          `)
-          .eq('id', id)
-          .single();
-        if (!error && data) {
-          return {
-            ...data,
-            costs: Array.isArray(data.costs) ? data.costs[0] : data.costs
-          } as OpportunityComplete;
-        }
-      } catch (err) {
-        console.warn('Error fetching opportunity by ID', err);
-      }
-    }
-    return null;
-  }
-
-  const agencies = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  const visits = readLocal<Visit>(STORAGE_KEYS.VISITS);
-  const costs = readLocal<OpportunityCost>(STORAGE_KEYS.COSTS);
-  const documents = readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS);
-  const paymentTerms = readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS);
-  const verificationItems = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  const followUps = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-
-  return {
-    ...opp,
-    agency: agencies.find(a => a.id === opp.agency_id),
-    visit: visits.find(v => v.id === opp.visit_id),
-    costs: costs.find(c => c.opportunity_id === opp.id),
-    documents: documents.filter(d => d.opportunity_id === opp.id),
-    payment_terms: paymentTerms.filter(p => p.opportunity_id === opp.id),
-    verification_items: verificationItems.filter(v => v.opportunity_id === opp.id),
-    follow_ups: followUps.filter(f => f.opportunity_id === opp.id)
-  };
+  return opps.find(o => o.id === id) || null;
 }
 
 export async function deleteOpportunity(id: string): Promise<boolean> {
@@ -317,34 +289,18 @@ export async function deleteOpportunity(id: string): Promise<boolean> {
       const { error } = await supabase.from('opportunities').delete().eq('id', id);
       if (!error) return true;
     } catch (err) {
-      console.warn('Falling back to local storage for deleteOpportunity', err);
+      console.warn('Falling back to file database for deleteOpportunity', err);
     }
   }
 
-  let opps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  opps = opps.filter(o => o.id !== id);
-  writeLocal(STORAGE_KEYS.OPPORTUNITIES, opps);
-
-  let costs = readLocal<OpportunityCost>(STORAGE_KEYS.COSTS);
-  costs = costs.filter(c => c.opportunity_id !== id);
-  writeLocal(STORAGE_KEYS.COSTS, costs);
-
-  let docs = readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS);
-  docs = docs.filter(d => d.opportunity_id !== id);
-  writeLocal(STORAGE_KEYS.DOCUMENTS, docs);
-
-  let pt = readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS);
-  pt = pt.filter(p => p.opportunity_id !== id);
-  writeLocal(STORAGE_KEYS.PAYMENT_TERMS, pt);
-
-  let vi = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  vi = vi.filter(v => v.opportunity_id !== id);
-  writeLocal(STORAGE_KEYS.VERIFICATION_ITEMS, vi);
-
-  let fu = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  fu = fu.filter(f => f.opportunity_id !== id);
-  writeLocal(STORAGE_KEYS.FOLLOW_UPS, fu);
-
+  const db = await ensureDataLoaded();
+  db.opportunities = db.opportunities.filter(o => o.id !== id);
+  db.costs = db.costs.filter(c => c.opportunity_id !== id);
+  db.documents = db.documents.filter(d => d.opportunity_id !== id);
+  db.payment_terms = db.payment_terms.filter(p => p.opportunity_id !== id);
+  db.verification_items = db.verification_items.filter(v => v.opportunity_id !== id);
+  db.follow_ups = db.follow_ups.filter(f => f.opportunity_id !== id);
+  await saveToFileDisk(db);
   return true;
 }
 
@@ -355,12 +311,12 @@ export async function saveOpportunityComplete(
   existingVisitId?: string
 ): Promise<{ opportunityId: string; agencyId: string; visitId: string }> {
   const now = new Date().toISOString();
+  const db = await ensureDataLoaded();
 
   // 1. Resolve or Create Agency
   let agencyId = existingAgencyId || formData.agency_id;
   if (!agencyId) {
-    const existingAgencies = await getAgencies(userId);
-    const matched = existingAgencies.find(
+    const matched = db.agencies.find(
       a => a.name.trim().toLowerCase() === formData.agency_name.trim().toLowerCase()
     );
     if (matched) {
@@ -500,27 +456,18 @@ export async function saveOpportunityComplete(
       if (paymentRecords.length > 0) await supabase.from('payment_terms').insert(paymentRecords);
       if (verificationRecords.length > 0) await supabase.from('verification_items').insert(verificationRecords);
     } catch (err) {
-      console.warn('Falling back to local storage for saveOpportunityComplete', err);
+      console.warn('Falling back to file database for saveOpportunityComplete', err);
     }
   }
 
-  // Also keep local state updated
-  const oppList = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  oppList.unshift(oppRecord);
-  writeLocal(STORAGE_KEYS.OPPORTUNITIES, oppList);
+  // Save directly to file on disk (data/db.json)
+  db.opportunities.unshift(oppRecord);
+  db.costs.unshift(costRecord);
+  db.documents.unshift(...docRecords);
+  db.payment_terms.unshift(...paymentRecords);
+  db.verification_items.unshift(...verificationRecords);
 
-  const costList = readLocal<OpportunityCost>(STORAGE_KEYS.COSTS);
-  costList.unshift(costRecord);
-  writeLocal(STORAGE_KEYS.COSTS, costList);
-
-  const docList = readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS);
-  writeLocal(STORAGE_KEYS.DOCUMENTS, [...docRecords, ...docList]);
-
-  const payList = readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS);
-  writeLocal(STORAGE_KEYS.PAYMENT_TERMS, [...paymentRecords, ...payList]);
-
-  const verList = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  writeLocal(STORAGE_KEYS.VERIFICATION_ITEMS, [...verificationRecords, ...verList]);
+  await saveToFileDisk(db);
 
   return {
     opportunityId,
@@ -544,16 +491,16 @@ export async function updateVerificationItem(
         .single();
       if (!error && data) return data as VerificationItem;
     } catch (err) {
-      console.warn('Fallback to local for updateVerificationItem', err);
+      console.warn('Fallback to file for updateVerificationItem', err);
     }
   }
 
-  const list = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  const idx = list.findIndex(v => v.id === id);
+  const db = await ensureDataLoaded();
+  const idx = db.verification_items.findIndex(v => v.id === id);
   if (idx !== -1) {
-    list[idx] = { ...list[idx], ...updates };
-    writeLocal(STORAGE_KEYS.VERIFICATION_ITEMS, list);
-    return list[idx];
+    db.verification_items[idx] = { ...db.verification_items[idx], ...updates };
+    await saveToFileDisk(db);
+    return db.verification_items[idx];
   }
   return null;
 }
@@ -582,13 +529,13 @@ export async function addVerificationItem(
         .single();
       if (!error && data) return data as VerificationItem;
     } catch (err) {
-      console.warn('Fallback to local for addVerificationItem', err);
+      console.warn('Fallback to file for addVerificationItem', err);
     }
   }
 
-  const list = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  list.unshift(newItem);
-  writeLocal(STORAGE_KEYS.VERIFICATION_ITEMS, list);
+  const db = await ensureDataLoaded();
+  db.verification_items.unshift(newItem);
+  await saveToFileDisk(db);
   return newItem;
 }
 
@@ -602,12 +549,12 @@ export async function getFollowUps(userId: string): Promise<FollowUp[]> {
         .order('follow_up_date', { ascending: true });
       if (!error && data) return data as FollowUp[];
     } catch (err) {
-      console.warn('Fallback to local for getFollowUps', err);
+      console.warn('Fallback to file for getFollowUps', err);
     }
   }
 
-  const list = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  return list.filter(f => f.user_id === userId);
+  const db = await ensureDataLoaded();
+  return db.follow_ups.filter(f => !userId || f.user_id === userId);
 }
 
 export async function createFollowUp(
@@ -629,13 +576,13 @@ export async function createFollowUp(
         .single();
       if (!error && res) return res as FollowUp;
     } catch (err) {
-      console.warn('Fallback to local for createFollowUp', err);
+      console.warn('Fallback to file for createFollowUp', err);
     }
   }
 
-  const list = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  list.unshift(newFollowUp);
-  writeLocal(STORAGE_KEYS.FOLLOW_UPS, list);
+  const db = await ensureDataLoaded();
+  db.follow_ups.unshift(newFollowUp);
+  await saveToFileDisk(db);
   return newFollowUp;
 }
 
@@ -654,16 +601,16 @@ export async function updateFollowUp(
         .single();
       if (!error && data) return data as FollowUp;
     } catch (err) {
-      console.warn('Fallback to local for updateFollowUp', err);
+      console.warn('Fallback to file for updateFollowUp', err);
     }
   }
 
-  const list = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  const idx = list.findIndex(f => f.id === id);
+  const db = await ensureDataLoaded();
+  const idx = db.follow_ups.findIndex(f => f.id === id);
   if (idx !== -1) {
-    list[idx] = { ...list[idx], ...updates };
-    writeLocal(STORAGE_KEYS.FOLLOW_UPS, list);
-    return list[idx];
+    db.follow_ups[idx] = { ...db.follow_ups[idx], ...updates };
+    await saveToFileDisk(db);
+    return db.follow_ups[idx];
   }
   return null;
 }
@@ -675,108 +622,61 @@ export async function deleteFollowUp(id: string): Promise<boolean> {
       const { error } = await supabase.from('follow_ups').delete().eq('id', id);
       if (!error) return true;
     } catch (err) {
-      console.warn('Fallback to local for deleteFollowUp', err);
+      console.warn('Fallback to file for deleteFollowUp', err);
     }
   }
 
-  let list = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  list = list.filter(f => f.id !== id);
-  writeLocal(STORAGE_KEYS.FOLLOW_UPS, list);
+  const db = await ensureDataLoaded();
+  db.follow_ups = db.follow_ups.filter(f => f.id !== id);
+  await saveToFileDisk(db);
   return true;
 }
 
-// DEMO DATA MANAGEMENT
-export function loadDemoData(userId: string) {
+// DEMO DATA CONTROLS
+export async function loadDemoData(userId: string) {
   const demo = generateDemoData(userId);
+  await clearDemoData(userId);
 
-  // Filter out any existing demo data first
-  clearDemoData(userId);
+  const db = await ensureDataLoaded();
+  db.agencies.unshift(...demo.agencies);
+  db.visits.unshift(...demo.visits);
+  db.opportunities.unshift(...demo.opportunities);
+  db.costs.unshift(...demo.costs);
+  db.documents.unshift(...demo.documents);
+  db.payment_terms.unshift(...demo.paymentTerms);
+  db.verification_items.unshift(...demo.verificationItems);
+  db.follow_ups.unshift(...demo.followUps);
 
-  const existingAgencies = readLocal<Agency>(STORAGE_KEYS.AGENCIES);
-  writeLocal(STORAGE_KEYS.AGENCIES, [...demo.agencies, ...existingAgencies]);
-
-  const existingVisits = readLocal<Visit>(STORAGE_KEYS.VISITS);
-  writeLocal(STORAGE_KEYS.VISITS, [...demo.visits, ...existingVisits]);
-
-  const existingOpps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  writeLocal(STORAGE_KEYS.OPPORTUNITIES, [...demo.opportunities, ...existingOpps]);
-
-  const existingCosts = readLocal<OpportunityCost>(STORAGE_KEYS.COSTS);
-  writeLocal(STORAGE_KEYS.COSTS, [...demo.costs, ...existingCosts]);
-
-  const existingDocs = readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS);
-  writeLocal(STORAGE_KEYS.DOCUMENTS, [...demo.documents, ...existingDocs]);
-
-  const existingPay = readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS);
-  writeLocal(STORAGE_KEYS.PAYMENT_TERMS, [...demo.paymentTerms, ...existingPay]);
-
-  const existingVer = readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS);
-  writeLocal(STORAGE_KEYS.VERIFICATION_ITEMS, [...demo.verificationItems, ...existingVer]);
-
-  const existingFol = readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS);
-  writeLocal(STORAGE_KEYS.FOLLOW_UPS, [...demo.followUps, ...existingFol]);
+  await saveToFileDisk(db);
 }
 
-export function clearDemoData(userId: string) {
-  const opps = readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES);
-  const demoOppIds = new Set(opps.filter(o => o.is_demo).map(o => o.id));
+export async function clearDemoData(userId: string) {
+  const db = await ensureDataLoaded();
+  const demoOppIds = new Set(db.opportunities.filter(o => o.is_demo).map(o => o.id));
 
-  writeLocal(
-    STORAGE_KEYS.AGENCIES,
-    readLocal<Agency>(STORAGE_KEYS.AGENCIES).filter(a => !a.name.includes('[DEMO DATA]'))
-  );
+  db.agencies = db.agencies.filter(a => !a.name.includes('[DEMO DATA]'));
+  db.visits = db.visits.filter(v => !v.id.startsWith('demo-'));
+  db.opportunities = db.opportunities.filter(o => !o.is_demo);
+  db.costs = db.costs.filter(c => !demoOppIds.has(c.opportunity_id));
+  db.documents = db.documents.filter(d => !demoOppIds.has(d.opportunity_id));
+  db.payment_terms = db.payment_terms.filter(p => !demoOppIds.has(p.opportunity_id));
+  db.verification_items = db.verification_items.filter(v => !demoOppIds.has(v.opportunity_id));
+  db.follow_ups = db.follow_ups.filter(f => !demoOppIds.has(f.opportunity_id));
 
-  writeLocal(
-    STORAGE_KEYS.VISITS,
-    readLocal<Visit>(STORAGE_KEYS.VISITS).filter(v => !v.id.startsWith('demo-'))
-  );
-
-  writeLocal(
-    STORAGE_KEYS.OPPORTUNITIES,
-    opps.filter(o => !o.is_demo)
-  );
-
-  writeLocal(
-    STORAGE_KEYS.COSTS,
-    readLocal<OpportunityCost>(STORAGE_KEYS.COSTS).filter(c => !demoOppIds.has(c.opportunity_id))
-  );
-
-  writeLocal(
-    STORAGE_KEYS.DOCUMENTS,
-    readLocal<OpportunityDocument>(STORAGE_KEYS.DOCUMENTS).filter(d => !demoOppIds.has(d.opportunity_id))
-  );
-
-  writeLocal(
-    STORAGE_KEYS.PAYMENT_TERMS,
-    readLocal<PaymentTerm>(STORAGE_KEYS.PAYMENT_TERMS).filter(p => !demoOppIds.has(p.opportunity_id))
-  );
-
-  writeLocal(
-    STORAGE_KEYS.VERIFICATION_ITEMS,
-    readLocal<VerificationItem>(STORAGE_KEYS.VERIFICATION_ITEMS).filter(v => !demoOppIds.has(v.opportunity_id))
-  );
-
-  writeLocal(
-    STORAGE_KEYS.FOLLOW_UPS,
-    readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS).filter(f => !demoOppIds.has(f.opportunity_id))
-  );
+  await saveToFileDisk(db);
 }
 
-export function clearAllData(userId?: string) {
-  if (userId) {
-    writeLocal(STORAGE_KEYS.AGENCIES, readLocal<Agency>(STORAGE_KEYS.AGENCIES).filter(a => a.user_id !== userId));
-    writeLocal(STORAGE_KEYS.VISITS, readLocal<Visit>(STORAGE_KEYS.VISITS).filter(v => v.user_id !== userId));
-    writeLocal(STORAGE_KEYS.OPPORTUNITIES, readLocal<Opportunity>(STORAGE_KEYS.OPPORTUNITIES).filter(o => o.user_id !== userId));
-    writeLocal(STORAGE_KEYS.FOLLOW_UPS, readLocal<FollowUp>(STORAGE_KEYS.FOLLOW_UPS).filter(f => f.user_id !== userId));
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.AGENCIES);
-    localStorage.removeItem(STORAGE_KEYS.VISITS);
-    localStorage.removeItem(STORAGE_KEYS.OPPORTUNITIES);
-    localStorage.removeItem(STORAGE_KEYS.FOLLOW_UPS);
-  }
-  localStorage.removeItem(STORAGE_KEYS.COSTS);
-  localStorage.removeItem(STORAGE_KEYS.DOCUMENTS);
-  localStorage.removeItem(STORAGE_KEYS.PAYMENT_TERMS);
-  localStorage.removeItem(STORAGE_KEYS.VERIFICATION_ITEMS);
+export async function clearAllData(userId?: string) {
+  const emptyDb: FileDatabase = {
+    agencies: [],
+    visits: [],
+    opportunities: [],
+    costs: [],
+    documents: [],
+    payment_terms: [],
+    verification_items: [],
+    follow_ups: []
+  };
+  await saveToFileDisk(emptyDb);
   localStorage.removeItem('mph_wizard_draft_v1');
 }

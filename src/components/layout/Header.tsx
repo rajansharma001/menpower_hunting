@@ -54,9 +54,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           title="Database Configuration"
           className="flex items-center space-x-1.5 text-2xs px-2.5 py-1 rounded-full border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 transition"
         >
-          <Database className={`w-3 h-3 ${isSupabaseConnected ? 'text-emerald-600' : 'text-slate-400'}`} />
+          <Database className={`w-3 h-3 ${isSupabaseConnected ? 'text-emerald-600' : 'text-teal-600'}`} />
           <span className="hidden sm:inline">
-            {isSupabaseConnected ? 'Supabase' : 'Local Storage'}
+            {isSupabaseConnected ? 'Supabase' : 'File: data/db.json'}
           </span>
           <span className={`w-1.5 h-1.5 rounded-full ${isSupabaseConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
         </Link>
