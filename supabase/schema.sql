@@ -8,13 +8,15 @@
 create extension if not exists "uuid-ossp";
 
 -- ==============================================================================
--- STEP 0: DROP ALL EXISTING POLICIES FIRST
--- Required by PostgreSQL: altering a column type is prohibited if any policy depends on it.
+-- STEP 0: DROP CONSTRAINTS & POLICIES DEPENDING ON user_id FIRST
+-- Required by PostgreSQL: cannot drop or alter type of a column while foreign keys or policies depend on it.
 -- ==============================================================================
 do $$
 declare
   pol record;
+  c record;
 begin
+  -- 1. Drop all policies on public tables
   for pol in 
     select schemaname, tablename, policyname 
     from pg_policies 
@@ -31,6 +33,20 @@ begin
       )
   loop
     execute format('drop policy if exists %I on %I.%I', pol.policyname, pol.schemaname, pol.tablename);
+  end loop;
+
+  -- 2. Drop all foreign key constraints on user_id columns
+  for c in
+    select tc.table_schema, tc.table_name, tc.constraint_name
+    from information_schema.table_constraints tc
+    join information_schema.key_column_usage kcu
+      on tc.constraint_name = kcu.constraint_name
+      and tc.table_schema = kcu.table_schema
+    where tc.constraint_type = 'FOREIGN KEY'
+      and tc.table_schema = 'public'
+      and kcu.column_name = 'user_id'
+  loop
+    execute format('alter table %I.%I drop constraint if exists %I', c.table_schema, c.table_name, c.constraint_name);
   end loop;
 end $$;
 
@@ -50,9 +66,10 @@ create table if not exists public.agencies (
   updated_at timestamptz default now()
 );
 
+-- Drop constraint FIRST before altering column type
+alter table if exists public.agencies drop constraint if exists agencies_user_id_fkey;
 alter table if exists public.agencies alter column user_id drop not null;
 alter table if exists public.agencies alter column user_id type text using user_id::text;
-alter table if exists public.agencies drop constraint if exists agencies_user_id_fkey;
 
 alter table public.agencies enable row level security;
 
@@ -78,9 +95,9 @@ create table if not exists public.visits (
   updated_at timestamptz default now()
 );
 
+alter table if exists public.visits drop constraint if exists visits_user_id_fkey;
 alter table if exists public.visits alter column user_id drop not null;
 alter table if exists public.visits alter column user_id type text using user_id::text;
-alter table if exists public.visits drop constraint if exists visits_user_id_fkey;
 
 alter table public.visits enable row level security;
 
@@ -133,9 +150,9 @@ create table if not exists public.opportunities (
   updated_at timestamptz default now()
 );
 
+alter table if exists public.opportunities drop constraint if exists opportunities_user_id_fkey;
 alter table if exists public.opportunities alter column user_id drop not null;
 alter table if exists public.opportunities alter column user_id type text using user_id::text;
-alter table if exists public.opportunities drop constraint if exists opportunities_user_id_fkey;
 
 alter table public.opportunities enable row level security;
 
@@ -262,9 +279,9 @@ create table if not exists public.follow_ups (
   created_at timestamptz default now()
 );
 
+alter table if exists public.follow_ups drop constraint if exists follow_ups_user_id_fkey;
 alter table if exists public.follow_ups alter column user_id drop not null;
 alter table if exists public.follow_ups alter column user_id type text using user_id::text;
-alter table if exists public.follow_ups drop constraint if exists follow_ups_user_id_fkey;
 
 alter table public.follow_ups enable row level security;
 
