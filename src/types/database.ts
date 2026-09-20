@@ -79,6 +79,8 @@ export interface Opportunity {
   work_permit_status?: WorkPermitStatus;
   estimated_total_processing_time?: string;
   timeline_basis?: TimelineBasis;
+  dofe_lot_number?: string;
+  free_visa_free_ticket?: boolean;
   evidence_status?: EvidenceStatus;
   pressure_flags?: string[];
   general_notes?: string;

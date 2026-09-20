@@ -23,8 +23,12 @@ import {
   Phone,
   User,
   AlertTriangle,
-  X
+  X,
+  Copy,
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
+import { auditLegalRecruitmentCost, getDofePortalUrl } from '../lib/dofe';
 
 export const OpportunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +52,7 @@ export const OpportunityDetailPage: React.FC = () => {
   const [showAddFollowUpModal, setShowAddFollowUpModal] = useState(false);
   const [followUpDate, setFollowUpDate] = useState(new Date().toISOString().split('T')[0]);
   const [followUpAction, setFollowUpAction] = useState('');
+  const [copiedLt, setCopiedLt] = useState(false);
 
   if (!opp) {
     return (
@@ -110,6 +115,11 @@ export const OpportunityDetailPage: React.FC = () => {
     : 0;
   const quotedTotal = c?.total_quoted_cost || 0;
   const difference = quotedTotal - itemizedTotal;
+  const legalAudit = auditLegalRecruitmentCost(
+    opp.country,
+    quotedTotal,
+    opp.free_visa_free_ticket
+  );
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
@@ -163,6 +173,16 @@ export const OpportunityDetailPage: React.FC = () => {
               </span>
             )}
             <Badge status={opp.evidence_status}>{opp.evidence_status}</Badge>
+            {opp.free_visa_free_ticket && (
+              <span className="text-2xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded">
+                Free Visa / Free Ticket
+              </span>
+            )}
+            {opp.dofe_lot_number && (
+              <span className="text-2xs font-mono font-bold text-blue-900 bg-blue-50 border border-blue-300 px-2 py-0.5 rounded">
+                LT: {opp.dofe_lot_number}
+              </span>
+            )}
           </div>
 
           <span className="text-2xs text-slate-400">
@@ -295,6 +315,53 @@ export const OpportunityDetailPage: React.FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* Legal Cost Directive Audit Banner */}
+            {legalAudit.isRegulated && (
+              <div
+                className={`p-3 rounded-md border text-xs space-y-2 ${
+                  legalAudit.status === 'violation'
+                    ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                    : 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center space-x-1.5 font-bold">
+                    {legalAudit.status === 'violation' ? (
+                      <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                    )}
+                    <span>
+                      {legalAudit.status === 'violation'
+                        ? 'Nepal Legal Cost Ceiling Warning (नि:शुल्क भिसा तथा टिकट)'
+                        : 'Compliant with Nepal Legal Cost Ceiling'}
+                    </span>
+                  </div>
+                  {opp.free_visa_free_ticket && (
+                    <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-white/80 border border-slate-300 text-slate-700 flex-shrink-0">
+                      Free Visa Declared
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-2xs text-slate-700 leading-relaxed">
+                  {legalAudit.status === 'violation'
+                    ? legalAudit.warningMessage
+                    : legalAudit.successMessage}
+                </p>
+
+                {legalAudit.status === 'violation' && (
+                  <div className="pt-1.5 border-t border-amber-200 text-2xs text-amber-900 flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Govt Service Fee Ceiling: <strong>NPR {legalAudit.legalCapNpr.toLocaleString()}</strong></span>
+                    <span>Agency Quoted Total: <strong>NPR {legalAudit.quotedCostNpr.toLocaleString()}</strong></span>
+                    <span className="font-bold text-red-700">
+                      Excess Surcharge: ~NPR {(legalAudit.quotedCostNpr - legalAudit.legalCapNpr).toLocaleString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Individual Itemized Costs Table */}
             {c && (
@@ -440,6 +507,93 @@ export const OpportunityDetailPage: React.FC = () => {
 
         {/* Right Column: Agency, Living, Documents, Timeline, Follow-ups */}
         <div className="space-y-5">
+          {/* DoFE Lot Number & Verification Card */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2.5 shadow-2xs text-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="font-bold text-slate-900 uppercase tracking-wider text-2xs flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-700" />
+                <span>DoFE Pre-Approval (पूर्व स्वीकृति)</span>
+              </h3>
+              {opp.dofe_lot_number ? (
+                <span className="text-2xs font-bold text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                  LT Number On File
+                </span>
+              ) : (
+                <span className="text-2xs font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                  No LT Number
+                </span>
+              )}
+            </div>
+
+            {opp.dofe_lot_number ? (
+              <div className="space-y-2.5">
+                <div className="p-2.5 bg-blue-50/60 rounded border border-blue-200 space-y-1">
+                  <div className="text-2xs text-blue-800 font-semibold">
+                    Approved Lot (LT) Number:
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-sm font-bold text-slate-900 tracking-wide">
+                      {opp.dofe_lot_number}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(opp.dofe_lot_number || '');
+                        setCopiedLt(true);
+                        setTimeout(() => setCopiedLt(false), 2000);
+                      }}
+                      className="px-2 py-1 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded text-2xs font-medium flex items-center gap-1 transition"
+                      title="Copy LT Number"
+                    >
+                      {copiedLt ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          <span className="text-emerald-700">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-slate-500" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-2xs text-slate-600 leading-relaxed">
+                  Verify this LT number on Nepal DoFE FEIMS to confirm quota, approved salary, contract terms, and licensed agency before signing or paying any advance.
+                </p>
+
+                <a
+                  href={getDofePortalUrl(opp.dofe_lot_number)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-blue-700 hover:bg-blue-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-2xs"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Verify on Nepal DoFE Portal</span>
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="p-2 bg-amber-50 rounded border border-amber-200 text-2xs text-amber-900 leading-relaxed">
+                  <strong>Missing Lot Number:</strong> Authorized foreign recruitment demands in Nepal require an approved Pre-Approval Lot Number (पूर्व स्वीकृति लट नं).
+                </div>
+                <p className="text-2xs text-slate-600">
+                  Ask the manpower agency for their DoFE LT number so you can independently verify vacancy authenticity.
+                </p>
+                <a
+                  href={getDofePortalUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-2xs font-semibold text-teal-700 hover:text-teal-900 hover:underline"
+                >
+                  <span>Open DoFE Official Portal</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+          </div>
+
           {/* Agency Details Card */}
           <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2.5 shadow-2xs text-xs">
             <h3 className="font-bold text-slate-900 uppercase tracking-wider text-2xs flex items-center gap-1.5 border-b border-slate-100 pb-2">

@@ -461,6 +461,8 @@ export async function saveOpportunityComplete(
     food_arrangement: formData.food_arrangement,
     transportation: formData.transportation,
     work_permit_status: formData.work_permit_status,
+    dofe_lot_number: formData.dofe_lot_number ? formData.dofe_lot_number.trim() : undefined,
+    free_visa_free_ticket: !!formData.free_visa_free_ticket,
     estimated_total_processing_time: formData.estimated_total_processing_time || undefined,
     timeline_basis: formData.timeline_basis,
     evidence_status: formData.evidence_status,

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { WizardFormData } from '../../types/form';
 import { CostBreakdownStatus } from '../../types/database';
-import { Banknote, ChevronDown, ChevronUp, Calculator } from 'lucide-react';
+import { auditLegalRecruitmentCost, isFreeVisaRegulatedCountry } from '../../lib/dofe';
+import { Banknote, ChevronDown, ChevronUp, Calculator, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 interface Step5Props {
   formData: WizardFormData;
@@ -60,6 +61,34 @@ export const Step5Costs: React.FC<Step5Props> = ({ formData, onChange }) => {
           value={formData.total_quoted_cost}
           onChange={e => onChange('total_quoted_cost', e.target.value)}
         />
+
+        {/* Legal Cost Ceiling Audit Notice for GCC & Malaysia */}
+        {formData.country && isFreeVisaRegulatedCountry(formData.country) && quotedTotal > 0 && (
+          <div
+            className={`p-2.5 rounded text-xs flex items-start space-x-2 border mt-2 ${
+              quotedTotal <= 10000
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                : 'bg-amber-50 text-amber-950 border-amber-300'
+            }`}
+          >
+            {quotedTotal <= 10000 ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+            ) : (
+              <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="space-y-0.5">
+              <strong className="block text-2xs uppercase tracking-wide">
+                {quotedTotal <= 10000
+                  ? `Complies with Nepal Government Free Visa / Ticket Directive`
+                  : `Nepal Government Legal Ceiling Alert (${formData.country})`}
+              </strong>
+              <p className="text-2xs leading-relaxed text-slate-700">
+                {auditLegalRecruitmentCost(formData.country, quotedTotal, formData.free_visa_free_ticket).warningMessage ||
+                  auditLegalRecruitmentCost(formData.country, quotedTotal, formData.free_visa_free_ticket).successMessage}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Itemized Cost Breakdown Rows */}

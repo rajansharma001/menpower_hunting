@@ -12,8 +12,12 @@ import {
   Search,
   Filter,
   FileText,
-  X
+  X,
+  Copy,
+  AlertTriangle,
+  FileCheck
 } from 'lucide-react';
+import { getDofePortalUrl } from '../lib/dofe';
 
 export const VerificationPage: React.FC = () => {
   const { opportunities, updateVerification, saveFollowUp } = useData();
@@ -21,6 +25,12 @@ export const VerificationPage: React.FC = () => {
   const [activeItemForNote, setActiveItemForNote] = useState<VerificationItem | null>(null);
   const [noteInput, setNoteInput] = useState('');
   const [sourceInput, setSourceInput] = useState('');
+  const [copiedLt, setCopiedLt] = useState<string | null>(null);
+
+  // Compute DoFE Stats
+  const oppsWithLt = opportunities.filter(o => o.dofe_lot_number && o.dofe_lot_number.trim().length > 0);
+  const oppsMissingLt = opportunities.filter(o => !o.dofe_lot_number || o.dofe_lot_number.trim().length === 0);
+  const freeVisaOpps = opportunities.filter(o => o.free_visa_free_ticket);
 
   // Collect all verification items across opportunities
   const allItems = opportunities.flatMap(opp => {
@@ -29,7 +39,9 @@ export const VerificationPage: React.FC = () => {
       oppTitle: `${opp.country} — ${opp.job_title}`,
       agencyName: opp.agency?.name || 'Agency',
       oppId: opp.id,
-      country: opp.country
+      country: opp.country,
+      dofeLotNumber: opp.dofe_lot_number,
+      freeVisa: opp.free_visa_free_ticket
     }));
   });
 
@@ -46,12 +58,14 @@ export const VerificationPage: React.FC = () => {
         agencyName: item.agencyName,
         country: item.country,
         oppId: item.oppId,
+        dofeLotNumber: item.dofeLotNumber,
+        freeVisa: item.freeVisa,
         items: []
       };
     }
     acc[item.oppId].items.push(item);
     return acc;
-  }, {} as Record<string, { oppTitle: string; agencyName: string; country: string; oppId: string; items: typeof allItems }>);
+  }, {} as Record<string, { oppTitle: string; agencyName: string; country: string; oppId: string; dofeLotNumber?: string; freeVisa?: boolean; items: typeof allItems }>);
 
   const handleOpenNoteModal = (item: VerificationItem) => {
     setActiveItemForNote(item);
@@ -111,6 +125,98 @@ export const VerificationPage: React.FC = () => {
         </div>
       </div>
 
+      {/* DoFE Official Pre-Approval & Lot Verification Dashboard */}
+      <div className="bg-white border border-slate-200 rounded-md p-4 shadow-2xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+          <div className="space-y-0.5">
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-blue-700" />
+              <span>DoFE Vacancy Pre-Approval & Legal Verification (पूर्व स्वीकृति)</span>
+            </h2>
+            <p className="text-2xs text-slate-600">
+              Department of Foreign Employment (DoFE) FEIMS Pre-Approval verification protects against fake visas and illegal quotas
+            </p>
+          </div>
+
+          <a
+            href={getDofePortalUrl()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-600 text-white rounded text-xs font-semibold shadow-2xs transition self-start sm:self-auto flex-shrink-0"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Open DoFE FEIMS Portal</span>
+          </a>
+        </div>
+
+        {/* Quick Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div className="bg-blue-50/60 border border-blue-200 rounded p-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-2xs text-blue-800 font-semibold block">Approved LT Numbers</span>
+              <span className="text-lg font-bold text-blue-950">{oppsWithLt.length} Vacancies</span>
+            </div>
+            <ShieldCheck className="w-5 h-5 text-blue-700" />
+          </div>
+
+          <div className="bg-amber-50/60 border border-amber-200 rounded p-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-2xs text-amber-800 font-semibold block">Missing LT (Unverified)</span>
+              <span className="text-lg font-bold text-amber-950">{oppsMissingLt.length} Vacancies</span>
+            </div>
+            <AlertTriangle className="w-5 h-5 text-amber-700" />
+          </div>
+
+          <div className="bg-emerald-50/60 border border-emerald-200 rounded p-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-2xs text-emerald-800 font-semibold block">Free Visa / Free Ticket</span>
+              <span className="text-lg font-bold text-emerald-950">{freeVisaOpps.length} Vacancies</span>
+            </div>
+            <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+          </div>
+        </div>
+
+        {/* Registered LT Quick Access List if available */}
+        {oppsWithLt.length > 0 && (
+          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+            <span className="text-2xs font-bold text-slate-700 uppercase tracking-wider block">
+              Recorded Pre-Approval Lot (LT) Numbers:
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {oppsWithLt.map(o => (
+                <div
+                  key={o.id}
+                  className="flex items-center gap-1.5 bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-2xs font-mono"
+                >
+                  <Link
+                    to={`/opportunities/${o.id}`}
+                    className="font-bold text-blue-900 hover:underline"
+                  >
+                    {o.dofe_lot_number}
+                  </Link>
+                  <span className="text-slate-400 font-sans">({o.country})</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(o.dofe_lot_number || '');
+                      setCopiedLt(o.dofe_lot_number || null);
+                      setTimeout(() => setCopiedLt(null), 2000);
+                    }}
+                    className="text-slate-500 hover:text-slate-800 ml-1 p-0.5"
+                    title="Copy LT Number"
+                  >
+                    {copiedLt === o.dofe_lot_number ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Grouped Opportunities Checklist Cards */}
       {Object.values(groupedByOpp).length === 0 ? (
         <div className="bg-white p-8 rounded-md border border-slate-200 text-center text-xs text-slate-500 space-y-3">
@@ -132,18 +238,63 @@ export const VerificationPage: React.FC = () => {
               className="bg-white border border-slate-200 rounded-md overflow-hidden shadow-2xs"
             >
               {/* Group Header */}
-              <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                  <h2 className="font-bold text-slate-900 text-sm">{group.oppTitle}</h2>
+              <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-bold text-slate-900 text-sm">{group.oppTitle}</h2>
+                    {group.freeVisa && (
+                      <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300">
+                        Free Visa/Ticket
+                      </span>
+                    )}
+                    {group.dofeLotNumber ? (
+                      <span className="inline-flex items-center gap-1 font-mono text-2xs font-bold text-blue-900 bg-blue-50 border border-blue-300 px-2 py-0.5 rounded">
+                        <span>LT: {group.dofeLotNumber}</span>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(group.dofeLotNumber || '');
+                            setCopiedLt(group.dofeLotNumber || null);
+                            setTimeout(() => setCopiedLt(null), 2000);
+                          }}
+                          className="hover:text-blue-950 p-0.5"
+                          title="Copy LT Number"
+                        >
+                          {copiedLt === group.dofeLotNumber ? (
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-blue-700" />
+                          )}
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300">
+                        Missing LT Number
+                      </span>
+                    )}
+                  </div>
                   <p className="text-2xs text-slate-500">{group.agencyName}</p>
                 </div>
-                <Link
-                  to={`/opportunities/${group.oppId}`}
-                  className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1"
-                >
-                  <span>Opportunity Details</span>
-                  <ExternalLink className="w-3 h-3" />
-                </Link>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {group.dofeLotNumber && (
+                    <a
+                      href={getDofePortalUrl(group.dofeLotNumber)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-2xs font-semibold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1"
+                    >
+                      <span>Check on DoFE</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <Link
+                    to={`/opportunities/${group.oppId}`}
+                    className="text-xs font-semibold text-teal-700 hover:underline flex items-center gap-1 ml-2"
+                  >
+                    <span>Opportunity Details</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
               </div>
 
               {/* Items List */}

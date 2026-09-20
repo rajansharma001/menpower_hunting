@@ -68,6 +68,8 @@ const INITIAL_FORM: WizardFormData = {
   cost_breakdown_status: 'Partial',
 
   work_permit_status: 'Employer Processing',
+  dofe_lot_number: '',
+  free_visa_free_ticket: false,
   documents_shown: {},
 
   estimated_total_processing_time: '4–6 months',

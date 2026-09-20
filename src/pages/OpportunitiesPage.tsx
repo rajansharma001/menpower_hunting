@@ -31,6 +31,8 @@ export const OpportunitiesPage: React.FC = () => {
   const [selectedAgency, setSelectedAgency] = useState('');
   const [selectedAccom, setSelectedAccom] = useState('');
   const [maxCost, setMaxCost] = useState('');
+  const [selectedFreeVisa, setSelectedFreeVisa] = useState('');
+  const [selectedHasLt, setSelectedHasLt] = useState('');
 
   // Mobile expanded rows state
   const [expandedMobileRowId, setExpandedMobileRowId] = useState<string | null>(null);
@@ -49,6 +51,10 @@ export const OpportunitiesPage: React.FC = () => {
       if (selectedAgency && o.agency_id !== selectedAgency) return false;
       if (selectedAccom && o.accommodation_type !== selectedAccom) return false;
       if (maxCost && o.costs && o.costs.total_quoted_cost > parseFloat(maxCost)) return false;
+      if (selectedFreeVisa === 'yes' && !o.free_visa_free_ticket) return false;
+      if (selectedFreeVisa === 'no' && o.free_visa_free_ticket) return false;
+      if (selectedHasLt === 'has_lt' && (!o.dofe_lot_number || !o.dofe_lot_number.trim())) return false;
+      if (selectedHasLt === 'missing_lt' && o.dofe_lot_number && o.dofe_lot_number.trim()) return false;
       return true;
     }).sort((a, b) => {
       if (sortField === 'cost') {
@@ -75,6 +81,8 @@ export const OpportunitiesPage: React.FC = () => {
     selectedAgency,
     selectedAccom,
     maxCost,
+    selectedFreeVisa,
+    selectedHasLt,
     sortField,
     sortDirection
   ]);
@@ -88,6 +96,8 @@ export const OpportunitiesPage: React.FC = () => {
     setSelectedAgency('');
     setSelectedAccom('');
     setMaxCost('');
+    setSelectedFreeVisa('');
+    setSelectedHasLt('');
     setSearchParams({});
   };
 
@@ -99,7 +109,9 @@ export const OpportunitiesPage: React.FC = () => {
     selectedEvidence ||
     selectedAgency ||
     selectedAccom ||
-    maxCost;
+    maxCost ||
+    selectedFreeVisa ||
+    selectedHasLt;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
@@ -150,7 +162,7 @@ export const OpportunitiesPage: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
           {/* Country */}
           <div>
             <label className="block text-2xs font-medium text-slate-500 mb-1">Country</label>
@@ -256,6 +268,34 @@ export const OpportunitiesPage: React.FC = () => {
             />
           </div>
 
+          {/* Free Visa / Free Ticket */}
+          <div>
+            <label className="block text-2xs font-medium text-slate-500 mb-1">Free Visa/Ticket</label>
+            <select
+              value={selectedFreeVisa}
+              onChange={e => setSelectedFreeVisa(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none"
+            >
+              <option value="">All</option>
+              <option value="yes">Free Visa Declared</option>
+              <option value="no">Standard Quoted</option>
+            </select>
+          </div>
+
+          {/* DoFE LT Number */}
+          <div>
+            <label className="block text-2xs font-medium text-slate-500 mb-1">DoFE Pre-Approval</label>
+            <select
+              value={selectedHasLt}
+              onChange={e => setSelectedHasLt(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none"
+            >
+              <option value="">All</option>
+              <option value="has_lt">Has LT Number</option>
+              <option value="missing_lt">Missing LT Number</option>
+            </select>
+          </div>
+
           {/* Sort */}
           <div>
             <label className="block text-2xs font-medium text-slate-500 mb-1">Sort By</label>
@@ -353,9 +393,21 @@ export const OpportunitiesPage: React.FC = () => {
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-100">
                         <div className="font-semibold text-slate-900">{opp.job_title}</div>
-                        {opp.job_sector && (
-                          <div className="text-2xs text-slate-500">{opp.job_sector}</div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                          {opp.job_sector && (
+                            <span className="text-2xs text-slate-500">{opp.job_sector}</span>
+                          )}
+                          {opp.dofe_lot_number && (
+                            <span className="text-2xs font-mono font-bold text-blue-900 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                              LT: {opp.dofe_lot_number}
+                            </span>
+                          )}
+                          {opp.free_visa_free_ticket && (
+                            <span className="text-2xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                              Free Visa
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-slate-700 border-r border-slate-100">
                         {opp.agency?.name || '—'}
@@ -465,13 +517,23 @@ export const OpportunitiesPage: React.FC = () => {
                       {opp.job_title}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                       <span className="text-xs font-bold text-slate-800">
                         NPR {quotedCost.toLocaleString()}
                       </span>
                       {opp.expected_net_salary && (
                         <span className="text-2xs text-slate-600">
                           (Net: {opp.expected_net_salary} {opp.net_salary_currency})
+                        </span>
+                      )}
+                      {opp.dofe_lot_number && (
+                        <span className="text-2xs font-mono font-bold text-blue-900 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
+                          LT: {opp.dofe_lot_number}
+                        </span>
+                      )}
+                      {opp.free_visa_free_ticket && (
+                        <span className="text-2xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                          Free Visa
                         </span>
                       )}
                     </div>

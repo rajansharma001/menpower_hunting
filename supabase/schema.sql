@@ -140,6 +140,8 @@ create table if not exists public.opportunities (
   food_arrangement text default 'Unclear',
   transportation text default 'Not Clear',
   work_permit_status text default 'Unknown',
+  dofe_lot_number text,
+  free_visa_free_ticket boolean default false,
   estimated_total_processing_time text,
   timeline_basis text default 'Unknown',
   evidence_status text default 'Needs Verification',
@@ -153,6 +155,8 @@ create table if not exists public.opportunities (
 alter table if exists public.opportunities drop constraint if exists opportunities_user_id_fkey;
 alter table if exists public.opportunities alter column user_id drop not null;
 alter table if exists public.opportunities alter column user_id type text using user_id::text;
+alter table if exists public.opportunities add column if not exists dofe_lot_number text;
+alter table if exists public.opportunities add column if not exists free_visa_free_ticket boolean default false;
 
 alter table public.opportunities enable row level security;
 

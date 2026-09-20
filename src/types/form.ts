@@ -83,6 +83,8 @@ export interface WizardFormData {
 
   // Step 6: Work Permit & Documents
   work_permit_status: WorkPermitStatus;
+  dofe_lot_number: string;
+  free_visa_free_ticket: boolean;
   documents_shown: Record<string, DocumentEntry>;
 
   // Step 7: Timeline & Payment
