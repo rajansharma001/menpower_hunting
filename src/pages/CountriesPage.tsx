@@ -87,10 +87,14 @@ export const CountriesPage: React.FC = () => {
       topSectors,
       topAccom
     };
-  }).filter(c => c.count > 0); // Display countries with at least 1 recorded opportunity first
+  }).sort((a, b) => b.count - a.count); // Show countries with recorded opportunities first
 
-  const handleCountryClick = (countryName: string) => {
-    navigate(`/opportunities?country=${encodeURIComponent(countryName)}`);
+  const handleCountryClick = (countryName: string, count: number) => {
+    if (count > 0) {
+      navigate(`/opportunities?country=${encodeURIComponent(countryName)}`);
+    } else {
+      navigate(`/new-visit?country=${encodeURIComponent(countryName)}`);
+    }
   };
 
   return (
@@ -101,35 +105,44 @@ export const CountriesPage: React.FC = () => {
           Country Research Aggregates
         </h1>
         <p className="text-xs text-slate-500">
-          Factual aggregates and recorded patterns across foreign employment destinations
+          Destination country profiles, recorded salary ranges, costs, and common job sectors
         </p>
       </div>
 
-      {countryAggregates.length === 0 ? (
-        <div className="bg-white p-8 rounded-md border border-slate-200 text-center text-xs text-slate-500">
-          No country opportunities recorded yet. Record your first agency visit to populate destination statistics.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {countryAggregates.map(item => (
-            <div
-              key={item.country.code}
-              onClick={() => handleCountryClick(item.country.name)}
-              className="bg-white border border-slate-200 hover:border-teal-600 rounded-md p-4 shadow-2xs cursor-pointer transition flex flex-col justify-between group space-y-3"
-            >
-              <div>
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Globe2 className="w-4 h-4 text-teal-700" />
-                    <h2 className="font-bold text-slate-900 text-sm group-hover:text-teal-900">
-                      {item.country.name}
-                    </h2>
-                  </div>
-                  <span className="text-2xs font-semibold px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-full">
-                    {item.count} {item.count === 1 ? 'Opportunity' : 'Opportunities'}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {countryAggregates.map(item => (
+          <div
+            key={item.country.code}
+            onClick={() => handleCountryClick(item.country.name, item.count)}
+            className="bg-white border border-slate-200 hover:border-teal-600 rounded-md p-4 shadow-2xs cursor-pointer transition flex flex-col justify-between group space-y-3"
+          >
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                <div className="flex items-center space-x-2">
+                  <Globe2 className="w-4 h-4 text-teal-700" />
+                  <h2 className="font-bold text-slate-900 text-sm group-hover:text-teal-900">
+                    {item.country.name}
+                  </h2>
+                </div>
+                <span
+                  className={`text-2xs font-semibold px-2 py-0.5 rounded-full border ${
+                    item.count > 0
+                      ? 'bg-teal-50 border-teal-200 text-teal-800'
+                      : 'bg-slate-100 border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {item.count} {item.count === 1 ? 'Opportunity' : 'Opportunities'}
+                </span>
+              </div>
+
+              {item.count === 0 ? (
+                <div className="py-4 text-center space-y-2">
+                  <p className="text-2xs text-slate-400 italic">No opportunities recorded yet for {item.country.name}.</p>
+                  <span className="inline-block text-2xs font-medium text-teal-700 group-hover:underline">
+                    + Record visit for {item.country.name} →
                   </span>
                 </div>
-
+              ) : (
                 <div className="space-y-2 text-xs">
                   {/* Salary Range */}
                   {item.minSalary !== null && (
@@ -193,16 +206,16 @@ export const CountriesPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-teal-700 group-hover:text-teal-900">
-                <span>View {item.country.name} Opportunities</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-              </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-2xs font-semibold text-teal-700 group-hover:text-teal-900">
+              <span>{item.count > 0 ? `View ${item.country.name} Opportunities` : `Record ${item.country.name} Visit`}</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

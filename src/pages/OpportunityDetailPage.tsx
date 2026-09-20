@@ -174,9 +174,17 @@ export const OpportunityDetailPage: React.FC = () => {
         </h1>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-          <span className="font-semibold text-slate-800">
-            {opp.agency?.name || 'Agency Name'}
-          </span>
+          {opp.agency ? (
+            <Link
+              to={`/agencies/${opp.agency.id}`}
+              className="font-semibold text-teal-800 hover:text-teal-950 hover:underline flex items-center gap-1"
+            >
+              <Building2 className="w-3.5 h-3.5 text-teal-700" />
+              <span>{opp.agency.name}</span>
+            </Link>
+          ) : (
+            <span className="font-semibold text-slate-800">Agency</span>
+          )}
           {opp.employer_name && (
             <span>
               Employer: <strong className="text-slate-700">{opp.employer_name}</strong>
@@ -463,6 +471,17 @@ export const OpportunityDetailPage: React.FC = () => {
               {opp.agency?.license_number && (
                 <div className="text-2xs text-slate-500 pt-1">
                   License: <span className="font-mono">{opp.agency.license_number}</span>
+                </div>
+              )}
+              {opp.agency && (
+                <div className="pt-2 border-t border-slate-100">
+                  <Link
+                    to={`/agencies/${opp.agency.id}`}
+                    className="text-2xs font-semibold text-teal-700 hover:text-teal-900 hover:underline flex items-center justify-between"
+                  >
+                    <span>View Agency Profile</span>
+                    <span>→</span>
+                  </Link>
                 </div>
               )}
             </div>

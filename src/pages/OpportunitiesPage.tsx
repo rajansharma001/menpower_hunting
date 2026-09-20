@@ -309,8 +309,24 @@ export const OpportunitiesPage: React.FC = () => {
             <tbody className="divide-y divide-slate-200">
               {filteredOpportunities.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-8 text-center text-slate-500">
-                    No matching opportunities found with selected filters.
+                  <td colSpan={13} className="py-10 text-center text-slate-500">
+                    <p className="mb-2">No opportunities found {hasActiveFilters ? 'matching selected filters' : 'recorded yet'}.</p>
+                    <div className="flex justify-center gap-2 pt-1">
+                      {hasActiveFilters && (
+                        <button
+                          onClick={handleResetFilters}
+                          className="px-3 py-1.5 border border-slate-300 rounded text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          Reset Filters
+                        </button>
+                      )}
+                      <Link
+                        to="/new-visit"
+                        className="px-3 py-1.5 bg-teal-700 text-white rounded text-xs font-semibold hover:bg-teal-600"
+                      >
+                        + Record New Visit
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -409,8 +425,16 @@ export const OpportunitiesPage: React.FC = () => {
       {/* 2. MOBILE EXPANDABLE CARDS (visible on mobile only) */}
       <div className="md:hidden space-y-2.5">
         {filteredOpportunities.length === 0 ? (
-          <div className="bg-white p-6 text-center text-slate-500 rounded border border-slate-200 text-xs">
-            No matching opportunities found with selected filters.
+          <div className="bg-white p-6 text-center text-slate-500 rounded border border-slate-200 text-xs space-y-2">
+            <p>No opportunities found {hasActiveFilters ? 'matching selected filters' : 'recorded yet'}.</p>
+            <div className="flex justify-center gap-2 pt-1">
+              <Link
+                to="/new-visit"
+                className="inline-block px-3.5 py-1.5 bg-teal-700 text-white rounded font-semibold text-xs"
+              >
+                + Record New Visit
+              </Link>
+            </div>
           </div>
         ) : (
           filteredOpportunities.map(opp => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WizardFormData } from '../../types/form';
 import { Agency } from '../../types/database';
 import { useData } from '../../context/DataContext';
@@ -95,6 +95,7 @@ const STEP_TITLES = [
 ];
 
 export const QuickVisitWizard: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<WizardFormData>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
@@ -108,7 +109,7 @@ export const QuickVisitWizard: React.FC = () => {
   const { agencies, saveOpportunity, showToast } = useData();
   const navigate = useNavigate();
 
-  // Load auto-draft from local storage on mount
+  // Load auto-draft from local storage on mount & check search params
   useEffect(() => {
     const savedDraft = localStorage.getItem(DRAFT_KEY);
     if (savedDraft) {
@@ -119,7 +120,20 @@ export const QuickVisitWizard: React.FC = () => {
         console.error('Error parsing wizard draft', e);
       }
     }
-  }, []);
+
+    const paramCountry = searchParams.get('country');
+    const paramAgencyId = searchParams.get('agencyId');
+
+    if (paramCountry) {
+      setFormData(prev => ({ ...prev, country: paramCountry }));
+    }
+    if (paramAgencyId && agencies.length > 0) {
+      const matched = agencies.find(a => a.id === paramAgencyId);
+      if (matched) {
+        handleAgencySelect(matched);
+      }
+    }
+  }, [searchParams, agencies]);
 
   // Save auto-draft on field changes
   const updateField = (field: keyof WizardFormData, value: any) => {

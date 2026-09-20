@@ -224,72 +224,94 @@ export const FollowUpsPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreate} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Target Opportunity *</label>
-                <select
-                  value={targetOppId}
-                  onChange={e => setTargetOppId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
-                >
-                  {opportunities.map(o => (
-                    <option key={o.id} value={o.id}>
-                      {o.country} — {o.job_title} ({o.agency?.name || 'Agency'})
-                    </option>
-                  ))}
-                </select>
+            {opportunities.length === 0 ? (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-900 space-y-2.5">
+                <p>No opportunity records found yet. Follow-ups are attached to specific job opportunities.</p>
+                <div className="pt-1 flex gap-2">
+                  <Link
+                    to="/new-visit"
+                    onClick={() => setShowModal(false)}
+                    className="inline-block px-3.5 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded text-xs font-semibold"
+                  >
+                    + Record First Visit Now →
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-3 py-1.5 border border-slate-300 rounded text-xs text-slate-700 hover:bg-slate-100"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
+            ) : (
+              <form onSubmit={handleCreate} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Target Opportunity *</label>
+                  <select
+                    value={targetOppId}
+                    onChange={e => setTargetOppId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
+                  >
+                    {opportunities.map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.country} — {o.job_title} ({o.agency?.name || 'Agency'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Action Description *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Call counselor to confirm work permit filing receipt"
-                  className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
-                  value={action}
-                  onChange={e => setAction(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Action Description *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Call counselor to confirm work permit filing receipt"
+                    className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
+                    value={action}
+                    onChange={e => setAction(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Follow-up Date *</label>
-                <input
-                  type="date"
-                  required
-                  className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Follow-up Date *</label>
+                  <input
+                    type="date"
+                    required
+                    className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                  />
+                </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Notes (Optional)</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Reference number mentioned by agency: #904"
-                  className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
-                  value={notes}
-                  onChange={e => setNotes(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Notes (Optional)</label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Reference number mentioned by agency: #904"
+                    className="w-full bg-slate-50 border border-slate-300 rounded p-2 text-xs text-slate-900"
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                  />
+                </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium"
-                >
-                  Schedule
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium"
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

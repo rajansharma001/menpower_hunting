@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { Agency } from '../types/database';
 import { exportAgenciesCSV } from '../lib/export';
@@ -15,15 +15,29 @@ import {
   Calendar,
   ExternalLink,
   Search,
-  X
+  X,
+  Edit2
 } from 'lucide-react';
 
 export const AgenciesPage: React.FC = () => {
-  const { agencies, opportunities, visits, addAgency, editAgency } = useData();
+  const { id } = useParams<{ id?: string }>();
+  const navigate = useNavigate();
+  const { agencies, opportunities, addAgency, editAgency } = useData();
   const [searchTerm, setSearchTerm] = useState('');
 
   // Selected agency modal for detail view
   const [selectedAgency, setSelectedAgency] = useState<Agency | null>(null);
+
+  useEffect(() => {
+    if (id && agencies.length > 0) {
+      const found = agencies.find(a => a.id === id);
+      if (found) setSelectedAgency(found);
+    }
+  }, [id, agencies]);
+
+  // Edit agency state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Agency>>({});
 
   // Add Agency modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -300,11 +314,21 @@ export const AgenciesPage: React.FC = () => {
               })()}
             </div>
 
-            {/* Close */}
-            <div className="pt-2 border-t border-slate-200 flex justify-end">
+            {/* Actions */}
+            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+              <Link
+                to={`/new-visit?agencyId=${selectedAgency.id}`}
+                className="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Record Visit at this Agency</span>
+              </Link>
               <button
-                onClick={() => setSelectedAgency(null)}
-                className="px-4 py-1.5 bg-slate-800 text-white rounded text-xs font-medium"
+                onClick={() => {
+                  setSelectedAgency(null);
+                  if (id) navigate('/agencies', { replace: true });
+                }}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-medium transition"
               >
                 Close
               </button>

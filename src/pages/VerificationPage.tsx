@@ -112,8 +112,16 @@ export const VerificationPage: React.FC = () => {
 
       {/* Grouped Opportunities Checklist Cards */}
       {Object.values(groupedByOpp).length === 0 ? (
-        <div className="bg-white p-8 rounded-md border border-slate-200 text-center text-xs text-slate-500">
-          No verification checklist items currently marked as &ldquo;{filterStatus}&rdquo;.
+        <div className="bg-white p-8 rounded-md border border-slate-200 text-center text-xs text-slate-500 space-y-3">
+          <p>No verification checklist items currently marked as &ldquo;{filterStatus}&rdquo;.</p>
+          <div className="flex justify-center gap-2">
+            <Link
+              to="/new-visit"
+              className="inline-block px-3.5 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-semibold text-xs transition"
+            >
+              + Record Agency Visit
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
