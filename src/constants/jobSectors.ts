@@ -1,0 +1,22 @@
+export const JOB_SECTORS: string[] = [
+  'Warehouse',
+  'Factory / Production',
+  'Manufacturing',
+  'Logistics',
+  'Construction',
+  'Hospitality',
+  'Hotel',
+  'Restaurant',
+  'Food / Bakery',
+  'Cleaning',
+  'Agriculture',
+  'Driver',
+  'Care Work',
+  'Security',
+  'Retail',
+  'IT / Computer',
+  'Office / Administration',
+  'Data Entry',
+  'Technical Work',
+  'Other'
+];
