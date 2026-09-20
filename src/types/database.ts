@@ -153,6 +153,19 @@ export interface FollowUp {
   created_at: string;
 }
 
+export interface VoiceMemo {
+  id: string;
+  opportunity_id?: string;
+  agency_id?: string;
+  title: string;
+  blob: Blob;
+  duration_seconds: number;
+  mime_type: string;
+  file_size_bytes: number;
+  created_at: string;
+  notes?: string;
+}
+
 export interface OpportunityComplete extends Opportunity {
   agency?: Agency;
   visit?: Visit;
@@ -161,4 +174,6 @@ export interface OpportunityComplete extends Opportunity {
   payment_terms?: PaymentTerm[];
   verification_items?: VerificationItem[];
   follow_ups?: FollowUp[];
+  voice_memos?: VoiceMemo[];
 }
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useData } from '../context/DataContext';
 import { Badge } from '../components/common/Badge';
@@ -26,11 +26,16 @@ import {
   X,
   Copy,
   ExternalLink,
-  ShieldAlert
+  ShieldAlert,
+  Mic
 } from 'lucide-react';
 import { auditLegalRecruitmentCost, getDofePortalUrl } from '../lib/dofe';
 import { calculatePaybackAnalysis, convertToNpr, formatNpr, NRB_BENCHMARK_RATES } from '../lib/currency';
 import { evaluateSafetyScore } from '../lib/safety';
+import { VoiceMemo } from '../types/database';
+import { getVoiceMemosByOpportunity, deleteVoiceMemo } from '../lib/audioDb';
+import { VoiceMemoPlayer } from '../components/audio/VoiceMemoPlayer';
+import { AudioRecorderModal } from '../components/audio/AudioRecorderModal';
 
 export const OpportunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +60,31 @@ export const OpportunityDetailPage: React.FC = () => {
   const [followUpDate, setFollowUpDate] = useState(new Date().toISOString().split('T')[0]);
   const [followUpAction, setFollowUpAction] = useState('');
   const [copiedLt, setCopiedLt] = useState(false);
+
+  // Field audio memos state
+  const [voiceMemos, setVoiceMemos] = useState<VoiceMemo[]>([]);
+  const [showAudioRecorder, setShowAudioRecorder] = useState(false);
+
+  useEffect(() => {
+    if (opp?.id) {
+      getVoiceMemosByOpportunity(opp.id)
+        .then((memos) => {
+          setVoiceMemos(memos);
+        })
+        .catch((err) => {
+          console.warn('Could not load voice memos', err);
+        });
+    }
+  }, [opp?.id]);
+
+  const handleDeleteVoiceMemo = async (memoId: string) => {
+    await deleteVoiceMemo(memoId);
+    setVoiceMemos((prev) => prev.filter((m) => m.id !== memoId));
+  };
+
+  const handleVoiceMemoSaved = (newMemo: VoiceMemo) => {
+    setVoiceMemos((prev) => [newMemo, ...prev]);
+  };
 
   if (!opp) {
     return (
@@ -164,6 +194,15 @@ export const OpportunityDetailPage: React.FC = () => {
           >
             <CalendarCheck2 className="w-3.5 h-3.5 text-amber-700" />
             <span>Add Follow-up</span>
+          </button>
+
+          <button
+            onClick={() => setShowAudioRecorder(true)}
+            className="px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-300 rounded text-xs font-semibold text-red-900 transition flex items-center gap-1.5"
+            title="Record office interview or verbal terms"
+          >
+            <Mic className="w-3.5 h-3.5 text-red-600" />
+            <span>Audio Memo ({voiceMemos.length})</span>
           </button>
 
           <button
@@ -765,7 +804,65 @@ export const OpportunityDetailPage: React.FC = () => {
             </div>
           )}
 
-          {/* 4. Verification Checklist Workspace */}
+          {/* 4. Field Voice Memos & Audio Evidence (कन्सल्टेन्सी अडियो रेकर्डिङ) */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div>
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Mic className="w-4 h-4 text-red-600" />
+                  <span>Field Voice Memos & Audio Evidence ({voiceMemos.length})</span>
+                </h2>
+                <p className="text-2xs text-slate-500">
+                  Offline audio recordings of counselor promises, fee demands, and interviews
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAudioRecorder(true)}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-2xs font-bold flex items-center gap-1.5 shadow-2xs transition self-start sm:self-auto"
+              >
+                <Mic className="w-3.5 h-3.5 fill-white" />
+                <span>Record Audio (नयाँ अडियो रेकर्ड)</span>
+              </button>
+            </div>
+
+            {voiceMemos.length === 0 ? (
+              <div className="p-4 text-center bg-slate-50 rounded border border-dashed border-slate-200 text-xs space-y-2">
+                <p className="text-slate-500 text-2xs">
+                  No audio recordings attached to this opportunity. Record verbal promises, salary terms, or cash demands on your next visit.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAudioRecorder(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-2xs font-semibold rounded shadow-2xs transition"
+                >
+                  <Mic className="w-3.5 h-3.5 text-red-600" />
+                  <span>Start 1-Tap Voice Recording</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {voiceMemos.map((memo) => (
+                  <VoiceMemoPlayer
+                    key={memo.id}
+                    memo={memo}
+                    onDelete={handleDeleteVoiceMemo}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Legal note */}
+            <div className="text-3xs text-slate-500 pt-1 flex items-center gap-1.5">
+              <span>🔒</span>
+              <span>
+                यी अडियो रेकर्डहरू तपाईंको आफ्नै फोन/ब्राउजरको सुरक्षित स्थानीय भण्डारण (IndexedDB) मा सुरक्षित रहन्छन्।
+              </span>
+            </div>
+          </div>
+
+          {/* 5. Verification Checklist Workspace */}
           <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3 shadow-2xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>
@@ -1212,6 +1309,16 @@ export const OpportunityDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal: Audio Recorder */}
+      <AudioRecorderModal
+        isOpen={showAudioRecorder}
+        onClose={() => setShowAudioRecorder(false)}
+        onSaved={handleVoiceMemoSaved}
+        opportunityId={opp.id}
+        agencyId={opp.agency_id}
+        defaultTitle={`${opp.job_title} - ${opp.country} कुराकानी`}
+      />
     </div>
   );
 };

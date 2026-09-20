@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Database, User, LogOut } from 'lucide-react';
+import { Search, Database, User, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface HeaderProps {
@@ -9,6 +9,20 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
   const { user, isSupabaseConnected, logout } = useAuth();
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 flex items-center justify-between px-4 sm:px-6">
@@ -47,6 +61,30 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
         >
           <Search className="w-5 h-5" />
         </button>
+
+        {/* Online / Offline Indicator */}
+        <div
+          title={isOnline ? 'App is Online (अनलाइन)' : 'Offline Mode Active (अफलाइन मोड - स्थानीय डेटा प्रयोग हुँदैछ)'}
+          className={`flex items-center space-x-1.5 text-2xs px-2.5 py-1 rounded-full border transition ${
+            isOnline
+              ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border-amber-300 text-amber-900 font-bold animate-pulse'
+          }`}
+        >
+          {isOnline ? (
+            <Wifi className="w-3 h-3 text-emerald-600" />
+          ) : (
+            <WifiOff className="w-3 h-3 text-amber-700" />
+          )}
+          <span className="hidden sm:inline">
+            {isOnline ? 'Online' : 'Offline Mode'}
+          </span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isOnline ? 'bg-emerald-500' : 'bg-amber-600'
+            }`}
+          />
+        </div>
 
         {/* Database Status Indicator */}
         <Link

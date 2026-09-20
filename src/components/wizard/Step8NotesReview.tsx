@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { WizardFormData } from '../../types/form';
-import { EvidenceStatus } from '../../types/database';
+import { EvidenceStatus, VoiceMemo } from '../../types/database';
 import { PRESSURE_FLAGS } from '../../constants/workflowOptions';
-import { ShieldAlert, CheckCircle2, AlertCircle, BookmarkPlus, CalendarPlus, Save } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, AlertCircle, BookmarkPlus, CalendarPlus, Save, Mic } from 'lucide-react';
 import { evaluateSafetyScore } from '../../lib/safety';
+import { VoiceMemoPlayer } from '../audio/VoiceMemoPlayer';
+import { AudioRecorderModal } from '../audio/AudioRecorderModal';
 
 interface Step8Props {
   formData: WizardFormData;
@@ -18,6 +20,9 @@ export const Step8NotesReview: React.FC<Step8Props> = ({
   onChange,
   onSave
 }) => {
+  const [showAudioModal, setShowAudioModal] = useState(false);
+  const [recordedMemos, setRecordedMemos] = useState<VoiceMemo[]>([]);
+
   const togglePressureFlag = (flag: string) => {
     let current = [...(formData.pressure_flags || [])];
     if (flag === 'None observed') {
@@ -181,6 +186,52 @@ export const Step8NotesReview: React.FC<Step8Props> = ({
         />
       </div>
 
+      {/* Field Audio Evidence & Voice Memos (कन्सल्टेन्सी अडियो रेकर्डिङ) */}
+      <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <Mic className="w-3.5 h-3.5 text-red-600" />
+              <span>Field Audio Memo & Voice Evidence ({recordedMemos.length})</span>
+            </label>
+            <p className="text-2xs text-slate-500">
+              Record counselor promises, fee negotiations, or verbal quotes during your visit
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAudioModal(true)}
+            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-2xs font-bold flex items-center gap-1 shadow-2xs transition flex-shrink-0"
+          >
+            <Mic className="w-3 h-3 fill-white" />
+            <span>Record Voice Memo</span>
+          </button>
+        </div>
+
+        {recordedMemos.length > 0 ? (
+          <div className="space-y-2.5">
+            {recordedMemos.map(memo => (
+              <VoiceMemoPlayer
+                key={memo.id}
+                memo={memo}
+                onDelete={id => setRecordedMemos(prev => prev.filter(m => m.id !== id))}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="p-3 bg-slate-50 rounded border border-dashed border-slate-200 text-center text-2xs text-slate-500 space-y-1">
+            <p>No audio recording attached to this visit yet.</p>
+            <button
+              type="button"
+              onClick={() => setShowAudioModal(true)}
+              className="inline-flex items-center gap-1 text-teal-700 hover:text-teal-900 font-semibold"
+            >
+              <span>+ Tap to record conversation audio</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Opportunity Review Summary Card */}
       <div className="bg-slate-900 text-white rounded-md p-4 space-y-3 shadow-xs">
         <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -289,6 +340,14 @@ export const Step8NotesReview: React.FC<Step8Props> = ({
           </button>
         </div>
       </div>
+
+      {/* Audio Recorder Modal */}
+      <AudioRecorderModal
+        isOpen={showAudioModal}
+        onClose={() => setShowAudioModal(false)}
+        onSaved={(newMemo) => setRecordedMemos(prev => [newMemo, ...prev])}
+        defaultTitle={`${formData.job_title || 'अन्तरवार्ता'} - ${formData.country || 'वैदेशिक रोजगार'} कुराकानी`}
+      />
     </div>
   );
 };

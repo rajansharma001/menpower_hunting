@@ -1,0 +1,18 @@
+﻿{
+  "name": "Foreign Employment Notebook - Nepal (म्यानपावर डायरी)",
+  "short_name": "Manpower Diary",
+  "description": "Private field notebook for tracking manpower visits, DoFE pre-approval verification, break-even payback calculation, and anti-fraud recording.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
