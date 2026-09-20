@@ -3,6 +3,7 @@ import { WizardFormData } from '../../types/form';
 import { EvidenceStatus } from '../../types/database';
 import { PRESSURE_FLAGS } from '../../constants/workflowOptions';
 import { ShieldAlert, CheckCircle2, AlertCircle, BookmarkPlus, CalendarPlus, Save } from 'lucide-react';
+import { evaluateSafetyScore } from '../../lib/safety';
 
 interface Step8Props {
   formData: WizardFormData;
@@ -48,6 +49,17 @@ export const Step8NotesReview: React.FC<Step8Props> = ({
 
   const quotedTotal = parseFloat(formData.total_quoted_cost || '0') || 0;
   const difference = quotedTotal - itemizedTotal;
+
+  const safety = evaluateSafetyScore({
+    pressure_flags: formData.pressure_flags,
+    receipt_status: formData.receipt_status,
+    payment_method: formData.payment_method,
+    payment_stages: formData.payment_stages,
+    timeline_basis: formData.timeline_basis,
+    written_cost: formData.written_cost,
+    dofe_lot_number: formData.dofe_lot_number,
+    country: formData.country
+  });
 
   return (
     <div className="space-y-4">
@@ -104,6 +116,54 @@ export const Step8NotesReview: React.FC<Step8Props> = ({
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Live Safety Assessment Card */}
+      <div className={`p-3.5 rounded-md border text-xs space-y-2.5 ${
+        safety.riskLevel === 'danger'
+          ? 'bg-red-50/90 border-red-300 text-red-950'
+          : safety.riskLevel === 'caution'
+          ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+          : 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-200/80 pb-2">
+          <span className="font-bold flex items-center gap-1.5 text-xs text-slate-900">
+            <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
+            <span>Consultancy Safety & Red-Flag Audit (सुरक्षा मूल्याङ्कन)</span>
+          </span>
+          <span className={`text-2xs font-bold px-2 py-0.5 rounded border self-start sm:self-auto ${safety.riskBadgeColor}`}>
+            {safety.riskBadgeLabel}
+          </span>
+        </div>
+
+        {safety.criticalBanners.length > 0 && (
+          <div className="space-y-1.5">
+            {safety.criticalBanners.map((banner, idx) => (
+              <div key={idx} className="p-2 bg-white rounded border border-red-300 text-2xs font-bold text-red-900 flex items-start gap-1.5">
+                <span className="text-sm leading-none">🛑</span>
+                <span className="leading-snug">{banner}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-1.5 pt-0.5">
+          {safety.checks.map(check => (
+            <span
+              key={check.id}
+              className={`px-2 py-0.5 rounded border text-2xs ${
+                check.status === 'critical'
+                  ? 'bg-red-100 text-red-900 border-red-300 font-bold'
+                  : check.status === 'warning'
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 font-medium'
+                  : 'bg-white text-emerald-800 border-emerald-200'
+              }`}
+            >
+              {check.status === 'pass' ? '✓ ' : check.status === 'critical' ? '🚨 ' : '⚠️ '}
+              {check.titleNp}
+            </span>
+          ))}
         </div>
       </div>
 

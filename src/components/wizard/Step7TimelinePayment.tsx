@@ -2,7 +2,7 @@ import React from 'react';
 import { WizardFormData } from '../../types/form';
 import { TimelineBasis, PaymentMethod, ReceiptStatus, RefundPolicy } from '../../types/database';
 import { PAYMENT_STAGES } from '../../constants/workflowOptions';
-import { Hourglass, CreditCard, Receipt, RotateCcw } from 'lucide-react';
+import { Hourglass, CreditCard, Receipt, RotateCcw, ShieldAlert } from 'lucide-react';
 
 interface Step7Props {
   formData: WizardFormData;
@@ -153,6 +153,22 @@ export const Step7TimelinePayment: React.FC<Step7Props> = ({ formData, onChange 
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Anti-Fraud Account & Receipt Warning */}
+        <div className="p-3 bg-amber-50 border border-amber-300 rounded text-2xs text-amber-950 space-y-1 mt-2">
+          <div className="flex items-center space-x-1.5 font-bold text-amber-900">
+            <ShieldAlert className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+            <span>नेपाल वैदेशिक रोजगार सुरक्षा सतर्कता (Anti-Fraud Rule)</span>
+          </div>
+          <p className="leading-relaxed">
+            <strong>व्यक्तिगत खातामा पैसा नहाल्नुहोस्:</strong> एजेन्ट वा कर्मचारीको व्यक्तिगत बैंक खाता, ईसेवा वा खल्तीमा रकम नपठाउनुहोस्। म्यानपावरको दर्ता भएको आधिकारिक बैंक खातामा मात्र भुक्तानी गर्नुहोस् र जति रकम तिर्नुहुन्छ त्यतिकैको <strong>भ्याट/प्यान बिल</strong> अनिवार्य लिनुहोस्।
+          </p>
+          {formData.receipt_status === 'Not Provided' && (
+            <p className="text-red-700 font-bold pt-1 border-t border-amber-200">
+              🚨 रसिद नदिई भुक्तानी गर्दा ठगी भएमा कानुनबमोजिम कुनै प्रमाण रहँदैन।
+            </p>
+          )}
         </div>
       </div>
 

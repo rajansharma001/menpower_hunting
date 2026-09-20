@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { auditLegalRecruitmentCost, getDofePortalUrl } from '../lib/dofe';
 import { calculatePaybackAnalysis, convertToNpr, formatNpr, NRB_BENCHMARK_RATES } from '../lib/currency';
+import { evaluateSafetyScore } from '../lib/safety';
 
 export const OpportunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -135,6 +136,15 @@ export const OpportunityDetailPage: React.FC = () => {
     accomCostForeign
   );
 
+  const safetyAssessment = evaluateSafetyScore({
+    ...opp,
+    payment_stages: opp.payment_terms?.map(p => p.payment_stage) || [],
+    payment_method: opp.payment_terms?.[0]?.payment_method,
+    receipt_status: opp.payment_terms?.[0]?.receipt_status,
+    total_quoted_cost: quotedTotal,
+    written_cost: c?.written_cost
+  });
+
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
       {/* Top Breadcrumb & Actions Bar */}
@@ -177,7 +187,7 @@ export const OpportunityDetailPage: React.FC = () => {
       {/* Main Title Card */}
       <div className="bg-white border border-slate-200 rounded-md p-4 sm:p-5 shadow-2xs space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-teal-800 uppercase tracking-wider bg-teal-50 border border-teal-200 px-2 py-0.5 rounded">
               {opp.country}
             </span>
@@ -197,6 +207,14 @@ export const OpportunityDetailPage: React.FC = () => {
                 LT: {opp.dofe_lot_number}
               </span>
             )}
+            <span className={`text-2xs font-bold px-2 py-0.5 rounded border inline-flex items-center gap-1 ${safetyAssessment.riskBadgeColor}`}>
+              {safetyAssessment.riskLevel === 'danger' ? (
+                <ShieldAlert className="w-3 h-3 text-red-600" />
+              ) : (
+                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              )}
+              <span>{safetyAssessment.riskBadgeLabel}</span>
+            </span>
           </div>
 
           <span className="text-2xs text-slate-400">
@@ -229,6 +247,28 @@ export const OpportunityDetailPage: React.FC = () => {
           {opp.job_sector && <span>Sector: {opp.job_sector}</span>}
         </div>
       </div>
+
+      {/* Critical Threat Alert Banners */}
+      {safetyAssessment.criticalBanners.length > 0 && (
+        <div className="bg-red-50 border-2 border-red-500 rounded-md p-4 space-y-2.5 shadow-xs">
+          <div className="flex items-center space-x-2 text-red-900 font-bold text-xs sm:text-sm">
+            <ShieldAlert className="w-5 h-5 text-red-600 flex-shrink-0 animate-pulse" />
+            <span>गम्भीर सुरक्षा चेतावनी: ठगी र जोखिमका संकेतहरू (CRITICAL RED FLAGS DETECTED)</span>
+          </div>
+          <div className="space-y-1.5 text-xs text-red-950">
+            {safetyAssessment.criticalBanners.map((banner, i) => (
+              <div key={i} className="flex items-start space-x-2 bg-white/80 p-2.5 rounded border border-red-200">
+                <span className="text-red-600 font-black text-sm flex-shrink-0 leading-none">🛑</span>
+                <span className="font-semibold leading-relaxed">{banner}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-2xs text-red-800 pt-1 font-medium flex flex-wrap gap-x-3 gap-y-1">
+            <span>• नेपाल वैदेशिक रोजगार ऐन अनुसार सक्कल पासपोर्ट जफत गर्न पाइँदैन।</span>
+            <span>• दलाल वा एजेन्टको व्यक्तिगत खाता वा eSewa मा हालेको रकमको कानुनी दाबी गर्न सकिँदैन।</span>
+          </div>
+        </div>
+      )}
 
       {/* 2-Column Responsive Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -526,7 +566,206 @@ export const OpportunityDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* 3. Verification Checklist Workspace */}
+          {/* 3. Agency Safety Scorecard & Threat Radar (सुरक्षा मूल्याङ्कन र चेतावनी) */}
+          <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3.5 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-100 pb-2">
+              <div className="flex items-center space-x-1.5">
+                {safetyAssessment.riskLevel === 'danger' ? (
+                  <ShieldAlert className="w-4 h-4 text-red-600" />
+                ) : (
+                  <ShieldCheck className="w-4 h-4 text-teal-700" />
+                )}
+                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Agency Safety Scorecard & Threat Radar (सुरक्षा मूल्याङ्कन र चेतावनी)
+                </h2>
+              </div>
+              <span className={`text-2xs font-bold px-2 py-0.5 rounded border self-start sm:self-auto ${safetyAssessment.riskBadgeColor}`}>
+                {safetyAssessment.riskBadgeLabel}
+              </span>
+            </div>
+
+            {/* Score & Risk Progress Meter */}
+            <div className="p-3 bg-slate-50 rounded-md border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-700">
+                  Fraud Resistance Score (ठगी जोखिम स्कोर)
+                </span>
+                <span className="font-bold text-slate-900">
+                  {safetyAssessment.score} / 100 (Grade {safetyAssessment.grade})
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    safetyAssessment.riskLevel === 'danger'
+                      ? 'bg-red-600'
+                      : safetyAssessment.riskLevel === 'caution'
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-600'
+                  }`}
+                  style={{ width: `${safetyAssessment.score}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-2xs text-slate-500">
+                <span>0% High Threat</span>
+                <span>50% Caution</span>
+                <span>100% Safe Standard</span>
+              </div>
+            </div>
+
+            {/* Observed Pressure Flags & Tactics */}
+            <div className="space-y-1.5">
+              <span className="text-2xs font-bold text-slate-500 uppercase tracking-wider block">
+                Reported Office Pressure & Threat Indicators:
+              </span>
+              {(opp.pressure_flags || []).length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {(opp.pressure_flags || []).map((flag, idx) => {
+                    const isCrit =
+                      flag.toLowerCase().includes('passport') ||
+                      flag.toLowerCase().includes('personal') ||
+                      flag.toLowerCase().includes('receipt') ||
+                      flag.includes('पासपोर्ट') ||
+                      flag.includes('व्यक्तिगत') ||
+                      flag.includes('रसिद');
+                    return (
+                      <span
+                        key={idx}
+                        className={`text-2xs font-medium px-2 py-0.5 rounded border flex items-center gap-1 ${
+                          isCrit
+                            ? 'bg-red-50 text-red-800 border-red-300 font-bold'
+                            : 'bg-amber-50 text-amber-900 border-amber-300'
+                        }`}
+                      >
+                        <span>{isCrit ? '🚨' : '⚠️'}</span>
+                        <span>{flag}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-2 bg-emerald-50/70 border border-emerald-200 rounded text-2xs text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <span>No high-pressure tactics or threat flags were recorded during this agency visit.</span>
+                </div>
+              )}
+            </div>
+
+            {/* 7-Point Safety Radar Rules Checklist */}
+            <div className="space-y-2 pt-1 border-t border-slate-100">
+              <span className="text-2xs font-bold text-slate-500 uppercase tracking-wider block">
+                7-Point Foreign Employment Safety Radar:
+              </span>
+
+              <div className="space-y-2">
+                {safetyAssessment.checks.map(check => (
+                  <div
+                    key={check.id}
+                    className={`p-2.5 rounded-md border text-xs space-y-1 transition ${
+                      check.status === 'critical'
+                        ? 'bg-red-50/80 border-red-300 text-red-950'
+                        : check.status === 'warning'
+                        ? 'bg-amber-50/80 border-amber-300 text-amber-950'
+                        : 'bg-slate-50 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center space-x-1.5 font-bold">
+                        {check.status === 'critical' ? (
+                          <ShieldAlert className="w-4 h-4 text-red-600 flex-shrink-0" />
+                        ) : check.status === 'warning' ? (
+                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                        )}
+                        <span>{check.headline}</span>
+                      </div>
+                      <span
+                        className={`text-3xs font-bold px-1.5 py-0.5 rounded border uppercase flex-shrink-0 ${
+                          check.status === 'critical'
+                            ? 'bg-red-100 text-red-800 border-red-300'
+                            : check.status === 'warning'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        }`}
+                      >
+                        {check.status === 'critical' ? 'CRITICAL' : check.status === 'warning' ? 'CAUTION' : 'PASS'}
+                      </span>
+                    </div>
+
+                    <p className="text-2xs leading-relaxed text-slate-700">
+                      {check.message}
+                    </p>
+
+                    <div className="pt-1 text-2xs font-medium text-slate-900 flex items-start gap-1">
+                      <span className="text-teal-700 font-bold">💡 Action Rule:</span>
+                      <span className="text-slate-700">{check.actionTip}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Emergency & Official DoFE Fraud Hotline Box */}
+            <div className="p-3 bg-slate-100 rounded-md border border-slate-300 text-2xs space-y-1.5 text-slate-800">
+              <div className="flex items-center justify-between font-bold text-slate-900">
+                <span className="flex items-center gap-1">
+                  <span>🚨</span>
+                  <span>Nepal DoFE Official Fraud & Grievance Helpline</span>
+                </span>
+                <span className="font-mono text-teal-800 font-bold">Toll Free: 1114</span>
+              </div>
+              <p className="text-slate-600 leading-relaxed">
+                यदि म्यानपावर वा दलालले सक्कल पासपोर्ट खोसेमा, व्यक्तिगत खाता वा ईसेवामा रकम मागेमा, वा नक्कली भिसा दिएमा वैदेशिक रोजगार विभागको कल सेन्टर (१११४ वा ०१-४७८३७०२) वा नजिकैको प्रहरी कार्यालयमा तुरुन्त उजुरी गर्नुहोस्।
+              </p>
+            </div>
+          </div>
+
+          {/* Payment Terms & Schedule Details */}
+          {(opp.payment_terms && opp.payment_terms.length > 0) && (
+            <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3 shadow-2xs">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                <CreditCard className="w-4 h-4 text-teal-700" />
+                <span>Recorded Payment Schedule & Refund Terms</span>
+              </h2>
+
+              <div className="divide-y divide-slate-100">
+                {opp.payment_terms.map(pt => (
+                  <div key={pt.id} className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="space-y-0.5">
+                      <span className="font-semibold text-slate-900">{pt.payment_stage}</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-slate-500">
+                        <span>Method: <strong className="text-slate-700">{pt.payment_method || 'Unspecified'}</strong></span>
+                        <span>Receipt: <strong className="text-slate-700">{pt.receipt_status || 'Unspecified'}</strong></span>
+                        <span>Refund: <strong className="text-slate-700">{pt.refund_policy || 'Unspecified'}</strong></span>
+                      </div>
+                      {pt.refund_notes && (
+                        <p className="text-2xs text-slate-600 italic">{pt.refund_notes}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Visit & Field Notes */}
+          {opp.general_notes && (
+            <div className="bg-white border border-slate-200 rounded-md p-4 space-y-2 shadow-2xs">
+              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                <Briefcase className="w-4 h-4 text-teal-700" />
+                <span>Field Visit & Interview Notes</span>
+              </h2>
+              <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                {opp.general_notes}
+              </p>
+            </div>
+          )}
+
+          {/* 4. Verification Checklist Workspace */}
           <div className="bg-white border border-slate-200 rounded-md p-4 space-y-3 shadow-2xs">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <div>

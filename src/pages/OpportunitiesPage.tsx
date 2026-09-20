@@ -16,9 +16,12 @@ import {
   Building2,
   MapPin,
   Eye,
-  Clock
+  Clock,
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { calculatePaybackAnalysis, convertToNpr, formatNpr } from '../lib/currency';
+import { evaluateSafetyScore } from '../lib/safety';
 
 export const OpportunitiesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,12 +38,13 @@ export const OpportunitiesPage: React.FC = () => {
   const [maxCost, setMaxCost] = useState('');
   const [selectedFreeVisa, setSelectedFreeVisa] = useState('');
   const [selectedHasLt, setSelectedHasLt] = useState('');
+  const [selectedSafety, setSelectedSafety] = useState('');
 
   // Mobile expanded rows state
   const [expandedMobileRowId, setExpandedMobileRowId] = useState<string | null>(null);
 
   // Sorting
-  const [sortField, setSortField] = useState<'created_at' | 'cost' | 'net_salary' | 'payback'>('created_at');
+  const [sortField, setSortField] = useState<'created_at' | 'cost' | 'net_salary' | 'payback' | 'safety'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const filteredOpportunities = useMemo(() => {
@@ -57,6 +61,12 @@ export const OpportunitiesPage: React.FC = () => {
       if (selectedFreeVisa === 'no' && o.free_visa_free_ticket) return false;
       if (selectedHasLt === 'has_lt' && (!o.dofe_lot_number || !o.dofe_lot_number.trim())) return false;
       if (selectedHasLt === 'missing_lt' && o.dofe_lot_number && o.dofe_lot_number.trim()) return false;
+      if (selectedSafety) {
+        const assessment = evaluateSafetyScore(o);
+        if (selectedSafety === 'safe' && assessment.riskLevel !== 'safe') return false;
+        if (selectedSafety === 'caution' && assessment.riskLevel !== 'caution') return false;
+        if (selectedSafety === 'threat' && assessment.riskLevel !== 'danger') return false;
+      }
       return true;
     }).sort((a, b) => {
       if (sortField === 'cost') {
@@ -82,6 +92,11 @@ export const OpportunitiesPage: React.FC = () => {
         const pB = getPaybackMonths(b);
         return sortDirection === 'asc' ? pA - pB : pB - pA;
       }
+      if (sortField === 'safety') {
+        const sA = evaluateSafetyScore(a).score;
+        const sB = evaluateSafetyScore(b).score;
+        return sortDirection === 'asc' ? sA - sB : sB - sA;
+      }
       return sortDirection === 'asc'
         ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         : new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -98,6 +113,7 @@ export const OpportunitiesPage: React.FC = () => {
     maxCost,
     selectedFreeVisa,
     selectedHasLt,
+    selectedSafety,
     sortField,
     sortDirection
   ]);
@@ -113,6 +129,7 @@ export const OpportunitiesPage: React.FC = () => {
     setMaxCost('');
     setSelectedFreeVisa('');
     setSelectedHasLt('');
+    setSelectedSafety('');
     setSearchParams({});
   };
 
@@ -126,7 +143,8 @@ export const OpportunitiesPage: React.FC = () => {
     selectedAccom ||
     maxCost ||
     selectedFreeVisa ||
-    selectedHasLt;
+    selectedHasLt ||
+    selectedSafety;
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
@@ -177,7 +195,7 @@ export const OpportunitiesPage: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2">
           {/* Country */}
           <div>
             <label className="block text-2xs font-medium text-slate-500 mb-1">Country</label>
@@ -311,6 +329,21 @@ export const OpportunitiesPage: React.FC = () => {
             </select>
           </div>
 
+          {/* Safety & Red Flags */}
+          <div>
+            <label className="block text-2xs font-medium text-slate-500 mb-1">Threat / Safety</label>
+            <select
+              value={selectedSafety}
+              onChange={e => setSelectedSafety(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none font-medium"
+            >
+              <option value="">All Safety</option>
+              <option value="safe">🛡️ Safe (≥80%)</option>
+              <option value="caution">⚠️ Caution (50–79%)</option>
+              <option value="threat">🚨 High Threat</option>
+            </select>
+          </div>
+
           {/* Sort */}
           <div>
             <label className="block text-2xs font-medium text-slate-500 mb-1">Sort By</label>
@@ -324,6 +357,8 @@ export const OpportunitiesPage: React.FC = () => {
               className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none font-medium"
             >
               <option value="created_at-desc">Newest First</option>
+              <option value="safety-desc">Safety: Safest First</option>
+              <option value="safety-asc">Safety: Riskiest First</option>
               <option value="payback-asc">Payback: Quickest Break-Even</option>
               <option value="cost-asc">Cost: Low to High</option>
               <option value="cost-desc">Cost: High to Low</option>
@@ -358,6 +393,7 @@ export const OpportunitiesPage: React.FC = () => {
                 <th className="py-2.5 px-3 border-r border-slate-200">Food</th>
                 <th className="py-2.5 px-3 border-r border-slate-200">Permit</th>
                 <th className="py-2.5 px-3 border-r border-slate-200">Processing</th>
+                <th className="py-2.5 px-3 border-r border-slate-200">Safety & Threat</th>
                 <th className="py-2.5 px-3 border-r border-slate-200">Evidence</th>
                 <th className="py-2.5 px-3 text-center">Action</th>
               </tr>
@@ -365,7 +401,7 @@ export const OpportunitiesPage: React.FC = () => {
             <tbody className="divide-y divide-slate-200">
               {filteredOpportunities.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-10 text-center text-slate-500">
+                  <td colSpan={14} className="py-10 text-center text-slate-500">
                     <p className="mb-2">No opportunities found {hasActiveFilters ? 'matching selected filters' : 'recorded yet'}.</p>
                     <div className="flex justify-center gap-2 pt-1">
                       {hasActiveFilters && (
@@ -408,6 +444,7 @@ export const OpportunitiesPage: React.FC = () => {
                     opp.net_salary_currency || opp.salary_currency || 'EUR',
                     opp.country
                   );
+                  const safety = evaluateSafetyScore(opp);
 
                   return (
                     <tr key={opp.id} className="hover:bg-slate-50/90 transition">
@@ -490,6 +527,32 @@ export const OpportunitiesPage: React.FC = () => {
                         {opp.estimated_total_processing_time || '—'}
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-100 whitespace-nowrap">
+                        <span
+                          className={`text-2xs font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${safety.riskBadgeColor}`}
+                          title={safety.riskBadgeLabel}
+                        >
+                          {safety.riskLevel === 'danger' ? (
+                            <ShieldAlert className="w-3 h-3 text-red-600 flex-shrink-0" />
+                          ) : (
+                            <ShieldCheck className="w-3 h-3 text-teal-600 flex-shrink-0" />
+                          )}
+                          <span>{safety.score}%</span>
+                        </span>
+                        {safety.criticalRedFlagsCount > 0 ? (
+                          <div className="text-3xs font-bold text-red-700 mt-0.5">
+                            🚨 {safety.criticalRedFlagsCount} Threat{safety.criticalRedFlagsCount > 1 ? 's' : ''}
+                          </div>
+                        ) : safety.warningCount > 0 ? (
+                          <div className="text-3xs font-medium text-amber-700 mt-0.5">
+                            ⚠️ {safety.warningCount} Caution
+                          </div>
+                        ) : (
+                          <div className="text-3xs font-medium text-emerald-700 mt-0.5">
+                            Clean
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 border-r border-slate-100 whitespace-nowrap">
                         <Badge status={opp.evidence_status} size="sm">
                           {opp.evidence_status || 'Needs Verification'}
                         </Badge>
@@ -537,6 +600,7 @@ export const OpportunitiesPage: React.FC = () => {
               opp.net_salary_currency || opp.salary_currency || 'EUR',
               opp.country
             );
+            const mobileSafety = evaluateSafetyScore(opp);
 
             return (
               <div
@@ -576,6 +640,14 @@ export const OpportunitiesPage: React.FC = () => {
                           ⏱️ {mobilePayback.paybackMonthsFormatted} mo
                         </span>
                       )}
+                      <span className={`text-2xs font-bold px-1.5 py-0.5 rounded border inline-flex items-center gap-1 ${mobileSafety.riskBadgeColor}`}>
+                        {mobileSafety.riskLevel === 'danger' ? (
+                          <ShieldAlert className="w-3 h-3 text-red-600 flex-shrink-0" />
+                        ) : (
+                          <ShieldCheck className="w-3 h-3 text-teal-600 flex-shrink-0" />
+                        )}
+                        <span>{mobileSafety.score}% {mobileSafety.riskLevel === 'danger' ? 'Threat' : 'Safe'}</span>
+                      </span>
                       {opp.dofe_lot_number && (
                         <span className="text-2xs font-mono font-bold text-blue-900 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
                           LT: {opp.dofe_lot_number}
@@ -640,7 +712,20 @@ export const OpportunitiesPage: React.FC = () => {
                         <span className="text-slate-400 block">Overtime:</span>
                         <span className="font-medium text-slate-800">{opp.overtime_status}</span>
                       </div>
+                      <div className="col-span-2 pt-1 border-t border-slate-200">
+                        <span className="text-slate-400 block">Safety & Red-Flag Audit:</span>
+                        <span className={`font-bold text-xs ${mobileSafety.riskLevel === 'danger' ? 'text-red-700' : 'text-slate-800'}`}>
+                          {mobileSafety.score}% — {mobileSafety.riskBadgeLabel}
+                        </span>
+                      </div>
                     </div>
+
+                    {mobileSafety.criticalBanners.length > 0 && (
+                      <div className="p-2 bg-red-50 border border-red-300 rounded text-2xs text-red-950 font-semibold flex items-start gap-1.5">
+                        <ShieldAlert className="w-3.5 h-3.5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <span>{mobileSafety.criticalBanners[0]}</span>
+                      </div>
+                    )}
 
                     <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                       <Link

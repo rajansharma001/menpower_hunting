@@ -39,13 +39,15 @@ export const PAYMENT_STAGES: string[] = [
 ];
 
 export const PRESSURE_FLAGS: string[] = [
-  'Asked for original passport',
-  'Guaranteed visa',
-  'Immediate cash pressure',
-  'Employer not disclosed',
-  'Gross/net unclear',
-  'Written agreement refused',
-  'Other',
+  'Asked for original passport (पासपोर्ट जफत)',
+  'Personal bank / wallet transfer asked (व्यक्तिगत खातामा भुक्तानी)',
+  'Cash without official VAT/PAN receipt (रसिद नदिने)',
+  'Immediate cash advance demanded (अगावै पेस्की माग)',
+  'Guaranteed visa / Unrealistic timeline (भ्रामक भिसा ग्यारेन्टी)',
+  'Unlicensed broker / outside office dealing (बिचौलिया / दलाल)',
+  'Employer not disclosed (रोजगारदाता गोप्य)',
+  'Written agreement refused (लिखित सम्झौता अस्वीकार)',
+  'Other pressure observed',
   'None observed'
 ];
 
