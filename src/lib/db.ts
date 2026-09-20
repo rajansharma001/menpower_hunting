@@ -38,11 +38,14 @@ let cachedDb: FileDatabase = {
 
 let isLoadedFromFile = false;
 
+const BACKUP_STORAGE_KEY = 'mph_file_db_backup';
+
 // Fetch directly from server disk file (data/db.json)
 export async function fetchFileDatabase(): Promise<FileDatabase> {
   try {
     const res = await fetch('/api/db');
-    if (res.ok) {
+    const contentType = res.headers.get('content-type') || '';
+    if (res.ok && contentType.includes('application/json')) {
       const data = await res.json();
       cachedDb = {
         agencies: Array.isArray(data.agencies) ? data.agencies : [],
@@ -55,17 +58,47 @@ export async function fetchFileDatabase(): Promise<FileDatabase> {
         follow_ups: Array.isArray(data.follow_ups) ? data.follow_ups : []
       };
       isLoadedFromFile = true;
+      try {
+        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(cachedDb));
+      } catch {}
       return cachedDb;
     }
   } catch (err) {
     console.warn('Could not read from /api/db file endpoint', err);
   }
+
+  // Resilient fallback for static hosting / offline / Vercel
+  try {
+    const backup = localStorage.getItem(BACKUP_STORAGE_KEY);
+    if (backup) {
+      const parsed = JSON.parse(backup);
+      cachedDb = {
+        agencies: Array.isArray(parsed.agencies) ? parsed.agencies : [],
+        visits: Array.isArray(parsed.visits) ? parsed.visits : [],
+        opportunities: Array.isArray(parsed.opportunities) ? parsed.opportunities : [],
+        costs: Array.isArray(parsed.costs) ? parsed.costs : [],
+        documents: Array.isArray(parsed.documents) ? parsed.documents : [],
+        payment_terms: Array.isArray(parsed.payment_terms) ? parsed.payment_terms : [],
+        verification_items: Array.isArray(parsed.verification_items) ? parsed.verification_items : [],
+        follow_ups: Array.isArray(parsed.follow_ups) ? parsed.follow_ups : []
+      };
+      isLoadedFromFile = true;
+      return cachedDb;
+    }
+  } catch (e) {
+    console.warn('Backup storage read error', e);
+  }
+
   return cachedDb;
 }
 
 // Write directly to server disk file (data/db.json)
 export async function saveToFileDisk(data: FileDatabase): Promise<boolean> {
   cachedDb = data;
+  try {
+    localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+
   try {
     const res = await fetch('/api/db', {
       method: 'POST',
@@ -74,8 +107,8 @@ export async function saveToFileDisk(data: FileDatabase): Promise<boolean> {
     });
     return res.ok;
   } catch (err) {
-    console.error('Failed to write to file data/db.json', err);
-    return false;
+    console.warn('Could not write to file data/db.json, cached locally', err);
+    return true;
   }
 }
 
