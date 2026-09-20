@@ -40,6 +40,17 @@ let isLoadedFromFile = false;
 
 const BACKUP_STORAGE_KEY = 'mph_file_db_backup';
 
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Fetch directly from server disk file (data/db.json)
 export async function fetchFileDatabase(): Promise<FileDatabase> {
   try {
@@ -161,7 +172,7 @@ export async function createAgency(agencyData: Omit<Agency, 'id' | 'created_at' 
 
   const newAgency: Agency = {
     ...agencyData,
-    id: 'agency_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     created_at: now,
     updated_at: now,
   };
@@ -237,7 +248,7 @@ export async function createVisit(visitData: Omit<Visit, 'id' | 'created_at' | '
 
   const newVisit: Visit = {
     ...visitData,
-    id: 'visit_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     created_at: now,
     updated_at: now,
   };
@@ -384,10 +395,22 @@ export async function saveOpportunityComplete(
   }
 
   // 3. Create Opportunity
-  const opportunityId = 'opp_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+  const opportunityId = generateUUID();
+
+  let resolvedUserId = userId;
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user?.id) {
+        resolvedUserId = authData.user.id;
+      }
+    } catch {}
+  }
+
   const oppRecord: Opportunity = {
     id: opportunityId,
-    user_id: userId,
+    user_id: resolvedUserId,
     agency_id: agencyId,
     visit_id: visitId,
     country: formData.country,
@@ -425,7 +448,7 @@ export async function saveOpportunityComplete(
 
   // 4. Create Opportunity Cost
   const costRecord: OpportunityCost = {
-    id: 'cost_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     opportunity_id: opportunityId,
     agency_service_charge: parseFloat(formData.agency_service_charge || '0') || 0,
     government_processing_fee: parseFloat(formData.government_processing_fee || '0') || 0,
@@ -448,7 +471,7 @@ export async function saveOpportunityComplete(
   const docRecords: OpportunityDocument[] = Object.entries(formData.documents_shown || {})
     .filter(([_, doc]) => doc.shown)
     .map(([docType, doc]) => ({
-      id: 'doc_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+      id: generateUUID(),
       opportunity_id: opportunityId,
       document_type: docType,
       shown: true,
@@ -460,7 +483,7 @@ export async function saveOpportunityComplete(
 
   // 6. Create Payment Terms
   const paymentRecords: PaymentTerm[] = (formData.payment_stages || []).map(stage => ({
-    id: 'pay_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     opportunity_id: opportunityId,
     payment_stage: stage,
     payment_method: formData.payment_method,
@@ -472,7 +495,7 @@ export async function saveOpportunityComplete(
 
   // 7. Auto-generate Standard Verification Items
   const verificationRecords: VerificationItem[] = DEFAULT_VERIFICATION_ITEMS.map(item => ({
-    id: 'ver_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     opportunity_id: opportunityId,
     item: item,
     status: 'Needs Verification',
@@ -480,7 +503,6 @@ export async function saveOpportunityComplete(
   }));
 
   // Persist to Supabase if client active
-  const supabase = getSupabase();
   if (supabase) {
     try {
       await supabase.from('opportunities').insert([oppRecord]);
@@ -545,7 +567,7 @@ export async function addVerificationItem(
 ): Promise<VerificationItem> {
   const supabase = getSupabase();
   const newItem: VerificationItem = {
-    id: 'ver_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    id: generateUUID(),
     opportunity_id: opportunityId,
     item,
     status: 'Needs Verification',
@@ -594,9 +616,20 @@ export async function createFollowUp(
   data: Omit<FollowUp, 'id' | 'created_at'>
 ): Promise<FollowUp> {
   const supabase = getSupabase();
+  let resolvedUserId = data.user_id;
+  if (supabase) {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user?.id) {
+        resolvedUserId = authData.user.id;
+      }
+    } catch {}
+  }
+
   const newFollowUp: FollowUp = {
     ...data,
-    id: 'fol_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now(),
+    user_id: resolvedUserId,
+    id: generateUUID(),
     created_at: new Date().toISOString()
   };
 
