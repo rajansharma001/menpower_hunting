@@ -7,6 +7,33 @@
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
+-- ==============================================================================
+-- STEP 0: DROP ALL EXISTING POLICIES FIRST
+-- Required by PostgreSQL: altering a column type is prohibited if any policy depends on it.
+-- ==============================================================================
+do $$
+declare
+  pol record;
+begin
+  for pol in 
+    select schemaname, tablename, policyname 
+    from pg_policies 
+    where schemaname = 'public' 
+      and tablename in (
+        'agencies', 
+        'visits', 
+        'opportunities', 
+        'opportunity_costs', 
+        'opportunity_documents', 
+        'payment_terms', 
+        'verification_items', 
+        'follow_ups'
+      )
+  loop
+    execute format('drop policy if exists %I on %I.%I', pol.policyname, pol.schemaname, pol.tablename);
+  end loop;
+end $$;
+
 -- 1. AGENCIES TABLE
 create table if not exists public.agencies (
   id uuid default gen_random_uuid() primary key,
@@ -30,10 +57,6 @@ alter table if exists public.agencies drop constraint if exists agencies_user_id
 alter table public.agencies enable row level security;
 
 -- Policy: Allow read & write with anon/publishable key and authenticated accounts
-drop policy if exists "Users can view their own agencies" on public.agencies;
-drop policy if exists "Users can insert their own agencies" on public.agencies;
-drop policy if exists "Users can update their own agencies" on public.agencies;
-drop policy if exists "Users can delete their own agencies" on public.agencies;
 drop policy if exists "Allow all access to agencies" on public.agencies;
 create policy "Allow all access to agencies"
   on public.agencies for all
@@ -61,10 +84,6 @@ alter table if exists public.visits drop constraint if exists visits_user_id_fke
 
 alter table public.visits enable row level security;
 
-drop policy if exists "Users can view their own visits" on public.visits;
-drop policy if exists "Users can insert their own visits" on public.visits;
-drop policy if exists "Users can update their own visits" on public.visits;
-drop policy if exists "Users can delete their own visits" on public.visits;
 drop policy if exists "Allow all access to visits" on public.visits;
 create policy "Allow all access to visits"
   on public.visits for all
@@ -120,10 +139,6 @@ alter table if exists public.opportunities drop constraint if exists opportuniti
 
 alter table public.opportunities enable row level security;
 
-drop policy if exists "Users can view their own opportunities" on public.opportunities;
-drop policy if exists "Users can insert their own opportunities" on public.opportunities;
-drop policy if exists "Users can update their own opportunities" on public.opportunities;
-drop policy if exists "Users can delete their own opportunities" on public.opportunities;
 drop policy if exists "Allow all access to opportunities" on public.opportunities;
 create policy "Allow all access to opportunities"
   on public.opportunities for all
@@ -160,10 +175,6 @@ create table if not exists public.opportunity_costs (
 
 alter table public.opportunity_costs enable row level security;
 
-drop policy if exists "Users can view their own opportunity_costs" on public.opportunity_costs;
-drop policy if exists "Users can insert their own opportunity_costs" on public.opportunity_costs;
-drop policy if exists "Users can update their own opportunity_costs" on public.opportunity_costs;
-drop policy if exists "Users can delete their own opportunity_costs" on public.opportunity_costs;
 drop policy if exists "Allow all access to opportunity_costs" on public.opportunity_costs;
 create policy "Allow all access to opportunity_costs"
   on public.opportunity_costs for all
@@ -186,10 +197,6 @@ create table if not exists public.opportunity_documents (
 
 alter table public.opportunity_documents enable row level security;
 
-drop policy if exists "Users can view their own opportunity_documents" on public.opportunity_documents;
-drop policy if exists "Users can insert their own opportunity_documents" on public.opportunity_documents;
-drop policy if exists "Users can update their own opportunity_documents" on public.opportunity_documents;
-drop policy if exists "Users can delete their own opportunity_documents" on public.opportunity_documents;
 drop policy if exists "Allow all access to opportunity_documents" on public.opportunity_documents;
 create policy "Allow all access to opportunity_documents"
   on public.opportunity_documents for all
@@ -212,10 +219,6 @@ create table if not exists public.payment_terms (
 
 alter table public.payment_terms enable row level security;
 
-drop policy if exists "Users can view their own payment_terms" on public.payment_terms;
-drop policy if exists "Users can insert their own payment_terms" on public.payment_terms;
-drop policy if exists "Users can update their own payment_terms" on public.payment_terms;
-drop policy if exists "Users can delete their own payment_terms" on public.payment_terms;
 drop policy if exists "Allow all access to payment_terms" on public.payment_terms;
 create policy "Allow all access to payment_terms"
   on public.payment_terms for all
@@ -238,10 +241,6 @@ create table if not exists public.verification_items (
 
 alter table public.verification_items enable row level security;
 
-drop policy if exists "Users can view their own verification_items" on public.verification_items;
-drop policy if exists "Users can insert their own verification_items" on public.verification_items;
-drop policy if exists "Users can update their own verification_items" on public.verification_items;
-drop policy if exists "Users can delete their own verification_items" on public.verification_items;
 drop policy if exists "Allow all access to verification_items" on public.verification_items;
 create policy "Allow all access to verification_items"
   on public.verification_items for all
@@ -269,10 +268,6 @@ alter table if exists public.follow_ups drop constraint if exists follow_ups_use
 
 alter table public.follow_ups enable row level security;
 
-drop policy if exists "Users can view their own follow_ups" on public.follow_ups;
-drop policy if exists "Users can insert their own follow_ups" on public.follow_ups;
-drop policy if exists "Users can update their own follow_ups" on public.follow_ups;
-drop policy if exists "Users can delete their own follow_ups" on public.follow_ups;
 drop policy if exists "Allow all access to follow_ups" on public.follow_ups;
 create policy "Allow all access to follow_ups"
   on public.follow_ups for all
