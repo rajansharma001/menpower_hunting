@@ -7,7 +7,7 @@ export function getSupabaseCredentials(): { url: string; anonKey: string } {
 
   const env = (import.meta as any).env || {};
   const url = customUrl || env.VITE_SUPABASE_URL || '';
-  const anonKey = customKey || env.VITE_SUPABASE_ANON_KEY || '';
+  const anonKey = customKey || env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || '';
 
   return { url, anonKey };
 }

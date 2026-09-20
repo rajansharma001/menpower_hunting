@@ -139,7 +139,7 @@ export const SettingsPage: React.FC = () => {
 
           <div>
             <label className="block font-medium text-slate-700 mb-1">
-              Supabase Anon / Public Key
+              Supabase Publishable / Anon Key (VITE_SUPABASE_PUBLISHABLE_KEY or anon public)
             </label>
             <input
               type="password"
