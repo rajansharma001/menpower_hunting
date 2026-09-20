@@ -215,11 +215,22 @@ export const FollowUpsPage: React.FC = () => {
 
       {/* New Follow-up Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 max-w-md w-full p-5 space-y-3 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <h3 className="text-sm font-bold text-slate-900">Schedule Follow-up</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation transition"
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>

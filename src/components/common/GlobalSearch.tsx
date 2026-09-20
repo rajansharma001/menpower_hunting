@@ -84,26 +84,42 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-24">
+    <div
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-start justify-center p-4 pt-16 sm:pt-24"
+    >
       <div className="bg-white border border-slate-300 rounded-lg shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         <div className="p-3 border-b border-slate-200 flex items-center gap-2 bg-slate-50">
           <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
-            className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none text-base"
-            placeholder="Search agencies, employers, jobs, countries, notes... (ESC to close)"
+            className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none text-sm sm:text-base min-w-0"
+            placeholder="Search agencies, employers, jobs, countries..."
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
           {query && (
             <button
               onClick={() => setQuery('')}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded"
+              className="text-slate-400 hover:text-slate-600 p-1.5 rounded touch-manipulation"
+              title="Clear search"
+              aria-label="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
           )}
+          <button
+            onClick={onClose}
+            className="px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-200 hover:bg-slate-300 rounded flex items-center gap-1 transition flex-shrink-0 touch-manipulation"
+            title="Close search"
+            aria-label="Close search"
+          >
+            <X className="w-4 h-4" />
+            <span className="hidden sm:inline">Close</span>
+          </button>
         </div>
 
         <div className="max-h-96 overflow-y-auto p-2 divide-y divide-slate-100">
@@ -193,8 +209,17 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ isOpen, onClose }) =
           )}
         </div>
 
-        <div className="p-2 border-t border-slate-200 bg-slate-50 text-right text-xs text-slate-500">
-          Press <kbd className="px-1.5 py-0.5 border border-slate-300 rounded bg-white font-mono text-2xs">ESC</kbd> to exit
+        <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+          <span className="hidden sm:inline">
+            Press <kbd className="px-1.5 py-0.5 border border-slate-300 rounded bg-white font-mono text-2xs">ESC</kbd> or click outside to exit
+          </span>
+          <span className="sm:hidden text-2xs text-slate-400">Tap outside or button to exit</span>
+          <button
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-semibold text-xs rounded transition touch-manipulation shadow-2xs"
+          >
+            Close Search
+          </button>
         </div>
       </div>
     </div>

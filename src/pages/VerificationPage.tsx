@@ -11,7 +11,8 @@ import {
   ExternalLink,
   Search,
   Filter,
-  FileText
+  FileText,
+  X
 } from 'lucide-react';
 
 export const VerificationPage: React.FC = () => {
@@ -210,11 +211,27 @@ export const VerificationPage: React.FC = () => {
 
       {/* Note / Source Modal */}
       {activeItemForNote && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setActiveItemForNote(null);
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 max-w-md w-full p-5 space-y-3 shadow-xl">
-            <h3 className="text-sm font-bold text-slate-900">
-              Verification Notes: {activeItemForNote.item}
-            </h3>
+            <div className="flex items-start justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-sm font-bold text-slate-900 pr-2">
+                Verification Notes: {activeItemForNote.item}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveItemForNote(null)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation flex-shrink-0 transition"
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
             <div className="space-y-3 text-xs">
               <div>
@@ -247,14 +264,14 @@ export const VerificationPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setActiveItemForNote(null)}
-                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100"
+                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100 touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveNote}
-                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium"
+                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium touch-manipulation"
                 >
                   Save Changes
                 </button>

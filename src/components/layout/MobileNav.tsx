@@ -29,13 +29,21 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenSearch }) => {
     <>
       {/* More Menu Slide-up / Modal */}
       {showMoreMenu && (
-        <div className="md:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-end">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowMoreMenu(false);
+          }}
+          className="md:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-end"
+        >
           <div className="bg-white rounded-t-xl p-4 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-3">
               <span className="font-bold text-sm text-slate-900">More Research Sections</span>
               <button
+                type="button"
                 onClick={() => setShowMoreMenu(false)}
-                className="p-1 rounded-md text-slate-500 hover:bg-slate-100"
+                className="p-1.5 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 touch-manipulation transition"
+                title="Close menu"
+                aria-label="Close menu"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -45,7 +53,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenSearch }) => {
               <NavLink
                 to="/agencies"
                 onClick={() => setShowMoreMenu(false)}
-                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium"
+                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium touch-manipulation"
               >
                 <Building2 className="w-5 h-5 text-teal-700" />
                 <span>Agencies</span>
@@ -54,7 +62,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenSearch }) => {
               <NavLink
                 to="/countries"
                 onClick={() => setShowMoreMenu(false)}
-                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium"
+                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium touch-manipulation"
               >
                 <Globe2 className="w-5 h-5 text-teal-700" />
                 <span>Countries</span>
@@ -63,7 +71,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenSearch }) => {
               <NavLink
                 to="/verification"
                 onClick={() => setShowMoreMenu(false)}
-                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium"
+                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium touch-manipulation"
               >
                 <ShieldCheck className="w-5 h-5 text-blue-700" />
                 <span>Verification</span>
@@ -72,23 +80,34 @@ export const MobileNav: React.FC<MobileNavProps> = ({ onOpenSearch }) => {
               <NavLink
                 to="/settings"
                 onClick={() => setShowMoreMenu(false)}
-                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium"
+                className="flex items-center space-x-3 p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-medium touch-manipulation"
               >
                 <Settings className="w-5 h-5 text-slate-700" />
                 <span>Settings</span>
               </NavLink>
             </div>
 
-            <button
-              onClick={() => {
-                setShowMoreMenu(false);
-                onOpenSearch();
-              }}
-              className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
-            >
-              <Search className="w-4 h-4 text-slate-500" />
-              <span>Search Research Data</span>
-            </button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  onOpenSearch();
+                }}
+                className="w-full flex items-center justify-center space-x-2 py-2.5 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 touch-manipulation"
+              >
+                <Search className="w-4 h-4 text-slate-500" />
+                <span>Search Research Data</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowMoreMenu(false)}
+                className="w-full py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold text-center transition touch-manipulation"
+              >
+                Close Menu
+              </button>
+            </div>
           </div>
         </div>
       )}

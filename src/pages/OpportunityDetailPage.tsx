@@ -22,7 +22,8 @@ import {
   MapPin,
   Phone,
   User,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 export const OpportunityDetailPage: React.FC = () => {
@@ -599,9 +600,25 @@ export const OpportunityDetailPage: React.FC = () => {
 
       {/* Modal: Add Checklist Item */}
       {showAddVerModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowAddVerModal(false);
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 p-5 max-w-md w-full shadow-lg space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">Add Verification Checklist Item</h3>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-sm font-bold text-slate-900">Add Verification Checklist Item</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddVerModal(false)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation transition"
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <form onSubmit={handleCreateVerification} className="space-y-3 text-xs">
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Check Item Name</label>
@@ -626,17 +643,17 @@ export const OpportunityDetailPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddVerModal(false)}
-                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100"
+                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100 touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium"
+                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium touch-manipulation"
                 >
                   Add Item
                 </button>
@@ -648,9 +665,25 @@ export const OpportunityDetailPage: React.FC = () => {
 
       {/* Modal: Add Follow-up */}
       {showAddFollowUpModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowAddFollowUpModal(false);
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 p-5 max-w-md w-full shadow-lg space-y-3">
-            <h3 className="text-sm font-bold text-slate-900">Schedule Follow-up Action</h3>
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-sm font-bold text-slate-900">Schedule Follow-up Action</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddFollowUpModal(false)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation transition"
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <form onSubmit={handleCreateFollowUp} className="space-y-3 text-xs">
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Action Description</label>
@@ -675,17 +708,17 @@ export const OpportunityDetailPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddFollowUpModal(false)}
-                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100"
+                  className="px-3 py-1.5 border border-slate-300 rounded text-slate-700 hover:bg-slate-100 touch-manipulation"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium"
+                  className="px-4 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded font-medium touch-manipulation"
                 >
                   Schedule Action
                 </button>

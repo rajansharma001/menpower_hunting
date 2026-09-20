@@ -231,7 +231,15 @@ export const AgenciesPage: React.FC = () => {
 
       {/* Selected Agency Detail Modal */}
       {selectedAgency && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              setSelectedAgency(null);
+              if (id) navigate('/agencies', { replace: true });
+            }
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-start justify-between border-b border-slate-200 pb-3">
               <div>
@@ -244,8 +252,14 @@ export const AgenciesPage: React.FC = () => {
                 </div>
               </div>
               <button
-                onClick={() => setSelectedAgency(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                type="button"
+                onClick={() => {
+                  setSelectedAgency(null);
+                  if (id) navigate('/agencies', { replace: true });
+                }}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation transition"
+                title="Close modal"
+                aria-label="Close modal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -318,17 +332,18 @@ export const AgenciesPage: React.FC = () => {
             <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
               <Link
                 to={`/new-visit?agencyId=${selectedAgency.id}`}
-                className="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition"
+                className="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition touch-manipulation"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Record Visit at this Agency</span>
               </Link>
               <button
+                type="button"
                 onClick={() => {
                   setSelectedAgency(null);
                   if (id) navigate('/agencies', { replace: true });
                 }}
-                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-medium transition"
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-medium transition touch-manipulation"
               >
                 Close
               </button>
@@ -339,11 +354,22 @@ export const AgenciesPage: React.FC = () => {
 
       {/* Add Agency Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-white rounded-md border border-slate-300 max-w-md w-full p-5 space-y-3 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-2">
               <h3 className="text-sm font-bold text-slate-900">Add New Manpower Agency</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-500 hover:text-slate-800 p-1.5 rounded hover:bg-slate-100 touch-manipulation transition"
+                title="Close dialog"
+                aria-label="Close dialog"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
