@@ -153,29 +153,50 @@ export async function getAgencies(userId: string): Promise<Agency[]> {
   return db.agencies.filter(a => !userId || a.user_id === userId);
 }
 
+function notifySupabaseError(action: string, error: any) {
+  if (!error) return;
+  const msg = error.message || (typeof error === 'string' ? error : 'Database operation failed');
+  console.error(`[Supabase ${action} Error]:`, error);
+  if (typeof window !== 'undefined') {
+    let friendly = `Supabase ${action}: ${msg}`;
+    if (msg.includes('relation "public.agencies" does not exist') || msg.includes('does not exist') || error.code === '42P01') {
+      friendly = `Supabase database tables are missing. Run schema.sql in Supabase SQL Editor. (Data saved to local backup)`;
+    } else if (msg.includes('violates row-level security') || error.code === '42501') {
+      friendly = `Supabase permission blocked by RLS. Run updated schema.sql in Supabase SQL Editor. (Data saved to local backup)`;
+    }
+    window.dispatchEvent(new CustomEvent('mph-toast', {
+      detail: { message: friendly, type: 'error' }
+    }));
+  }
+}
+
 export async function createAgency(agencyData: Omit<Agency, 'id' | 'created_at' | 'updated_at'>): Promise<Agency> {
   const supabase = getSupabase();
   const now = new Date().toISOString();
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('agencies')
-        .insert([{ ...agencyData, created_at: now, updated_at: now }])
-        .select()
-        .single();
-      if (!error && data) return data as Agency;
-    } catch (err) {
-      console.warn('Falling back to file database for createAgency', err);
-    }
-  }
-
   const newAgency: Agency = {
     ...agencyData,
     id: generateUUID(),
     created_at: now,
     updated_at: now,
   };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('agencies')
+        .insert([newAgency])
+        .select()
+        .single();
+      if (error) {
+        notifySupabaseError('Agency create', error);
+      } else if (data) {
+        // created in Supabase successfully
+      }
+    } catch (err) {
+      console.warn('Falling back to file database for createAgency', err);
+      notifySupabaseError('Agency create', err);
+    }
+  }
 
   const db = await ensureDataLoaded();
   db.agencies.unshift(newAgency);
@@ -195,9 +216,11 @@ export async function updateAgency(id: string, updates: Partial<Agency>): Promis
         .eq('id', id)
         .select()
         .single();
+      if (error) notifySupabaseError('Agency update', error);
       if (!error && data) return data as Agency;
     } catch (err) {
       console.warn('Falling back to file database for updateAgency', err);
+      notifySupabaseError('Agency update', err);
     }
   }
 
@@ -216,9 +239,11 @@ export async function deleteAgency(id: string): Promise<boolean> {
   if (supabase) {
     try {
       const { error } = await supabase.from('agencies').delete().eq('id', id);
+      if (error) notifySupabaseError('Agency delete', error);
       if (!error) return true;
     } catch (err) {
       console.warn('Falling back to file database for deleteAgency', err);
+      notifySupabaseError('Agency delete', err);
     }
   }
 
@@ -232,26 +257,26 @@ export async function deleteAgency(id: string): Promise<boolean> {
 export async function createVisit(visitData: Omit<Visit, 'id' | 'created_at' | 'updated_at'>): Promise<Visit> {
   const supabase = getSupabase();
   const now = new Date().toISOString();
-
-  if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('visits')
-        .insert([{ ...visitData, created_at: now, updated_at: now }])
-        .select()
-        .single();
-      if (!error && data) return data as Visit;
-    } catch (err) {
-      console.warn('Falling back to file database for createVisit', err);
-    }
-  }
-
   const newVisit: Visit = {
     ...visitData,
     id: generateUUID(),
     created_at: now,
     updated_at: now,
   };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('visits')
+        .insert([newVisit])
+        .select()
+        .single();
+      if (error) notifySupabaseError('Visit create', error);
+    } catch (err) {
+      console.warn('Falling back to file database for createVisit', err);
+      notifySupabaseError('Visit create', err);
+    }
+  }
 
   const db = await ensureDataLoaded();
   db.visits.unshift(newVisit);
@@ -505,13 +530,45 @@ export async function saveOpportunityComplete(
   // Persist to Supabase if client active
   if (supabase) {
     try {
-      await supabase.from('opportunities').insert([oppRecord]);
-      await supabase.from('opportunity_costs').insert([costRecord]);
-      if (docRecords.length > 0) await supabase.from('opportunity_documents').insert(docRecords);
-      if (paymentRecords.length > 0) await supabase.from('payment_terms').insert(paymentRecords);
-      if (verificationRecords.length > 0) await supabase.from('verification_items').insert(verificationRecords);
-    } catch (err) {
+      // 1. Ensure parent agency exists in Supabase so foreign key constraint succeeds
+      const agencyRecord = db.agencies.find(a => a.id === agencyId);
+      if (agencyRecord) {
+        await supabase.from('agencies').upsert([agencyRecord], { onConflict: 'id' });
+      }
+
+      // 2. Ensure parent visit exists in Supabase so foreign key constraint succeeds
+      const visitRecord = db.visits.find(v => v.id === visitId);
+      if (visitRecord) {
+        await supabase.from('visits').upsert([visitRecord], { onConflict: 'id' });
+      }
+
+      // 3. Insert opportunity
+      const { error: oppErr } = await supabase.from('opportunities').insert([oppRecord]);
+      if (oppErr) {
+        notifySupabaseError('Opportunity save', oppErr);
+      } else {
+        // 4. Insert child records only after parent opportunity is confirmed
+        const { error: costErr } = await supabase.from('opportunity_costs').insert([costRecord]);
+        if (costErr) notifySupabaseError('Opportunity Cost save', costErr);
+
+        if (docRecords.length > 0) {
+          const { error: docErr } = await supabase.from('opportunity_documents').insert(docRecords);
+          if (docErr) notifySupabaseError('Opportunity Documents save', docErr);
+        }
+
+        if (paymentRecords.length > 0) {
+          const { error: payErr } = await supabase.from('payment_terms').insert(paymentRecords);
+          if (payErr) notifySupabaseError('Payment Terms save', payErr);
+        }
+
+        if (verificationRecords.length > 0) {
+          const { error: verErr } = await supabase.from('verification_items').insert(verificationRecords);
+          if (verErr) notifySupabaseError('Verification Items save', verErr);
+        }
+      }
+    } catch (err: any) {
       console.warn('Falling back to file database for saveOpportunityComplete', err);
+      notifySupabaseError('Opportunity save', err);
     }
   }
 
@@ -544,9 +601,11 @@ export async function updateVerificationItem(
         .eq('id', id)
         .select()
         .single();
+      if (error) notifySupabaseError('Verification update', error);
       if (!error && data) return data as VerificationItem;
     } catch (err) {
       console.warn('Fallback to file for updateVerificationItem', err);
+      notifySupabaseError('Verification update', err);
     }
   }
 
@@ -582,9 +641,11 @@ export async function addVerificationItem(
         .insert([newItem])
         .select()
         .single();
+      if (error) notifySupabaseError('Verification add', error);
       if (!error && data) return data as VerificationItem;
     } catch (err) {
       console.warn('Fallback to file for addVerificationItem', err);
+      notifySupabaseError('Verification add', err);
     }
   }
 
@@ -640,9 +701,11 @@ export async function createFollowUp(
         .insert([newFollowUp])
         .select()
         .single();
+      if (error) notifySupabaseError('Follow-up create', error);
       if (!error && res) return res as FollowUp;
     } catch (err) {
       console.warn('Fallback to file for createFollowUp', err);
+      notifySupabaseError('Follow-up create', err);
     }
   }
 
@@ -665,9 +728,11 @@ export async function updateFollowUp(
         .eq('id', id)
         .select()
         .single();
+      if (error) notifySupabaseError('Follow-up update', error);
       if (!error && data) return data as FollowUp;
     } catch (err) {
       console.warn('Fallback to file for updateFollowUp', err);
+      notifySupabaseError('Follow-up update', err);
     }
   }
 
@@ -686,9 +751,11 @@ export async function deleteFollowUp(id: string): Promise<boolean> {
   if (supabase) {
     try {
       const { error } = await supabase.from('follow_ups').delete().eq('id', id);
+      if (error) notifySupabaseError('Follow-up delete', error);
       if (!error) return true;
     } catch (err) {
       console.warn('Fallback to file for deleteFollowUp', err);
+      notifySupabaseError('Follow-up delete', err);
     }
   }
 
@@ -696,6 +763,107 @@ export async function deleteFollowUp(id: string): Promise<boolean> {
   db.follow_ups = db.follow_ups.filter(f => f.id !== id);
   await saveToFileDisk(db);
   return true;
+}
+
+export async function syncAllLocalDataToSupabase(): Promise<{
+  success: boolean;
+  message: string;
+  counts?: { agencies: number; visits: number; opportunities: number };
+}> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return { success: false, message: 'Supabase is not connected. Check credentials in Settings.' };
+  }
+
+  try {
+    const db = await ensureDataLoaded();
+
+    // Verify agencies table existence
+    const { error: testErr } = await supabase.from('agencies').select('id', { head: true, count: 'exact' });
+    if (testErr) {
+      if (testErr.code === '42P01' || testErr.message?.includes('does not exist')) {
+        return {
+          success: false,
+          message: 'PostgreSQL tables not found in Supabase. Please copy and run schema.sql in your Supabase SQL Editor.'
+        };
+      }
+      return { success: false, message: `Supabase error: ${testErr.message}` };
+    }
+
+    // 1. Sync Agencies
+    if (db.agencies.length > 0) {
+      const { error } = await supabase.from('agencies').upsert(db.agencies, { onConflict: 'id' });
+      if (error) throw new Error(`Agencies sync failed: ${error.message}`);
+    }
+
+    // 2. Sync Visits
+    if (db.visits.length > 0) {
+      const { error } = await supabase.from('visits').upsert(db.visits, { onConflict: 'id' });
+      if (error) throw new Error(`Visits sync failed: ${error.message}`);
+    }
+
+    // 3. Sync Opportunities (strip joined objects)
+    if (db.opportunities.length > 0) {
+      const cleanOpps = db.opportunities.map(o => {
+        const copy = { ...o };
+        delete (copy as any).agency;
+        delete (copy as any).visit;
+        delete (copy as any).costs;
+        delete (copy as any).documents;
+        delete (copy as any).payment_terms;
+        delete (copy as any).verification_items;
+        delete (copy as any).follow_ups;
+        return copy;
+      });
+      const { error } = await supabase.from('opportunities').upsert(cleanOpps, { onConflict: 'id' });
+      if (error) throw new Error(`Opportunities sync failed: ${error.message}`);
+    }
+
+    // 4. Sync Costs
+    if (db.costs.length > 0) {
+      const { error } = await supabase.from('opportunity_costs').upsert(db.costs, { onConflict: 'id' });
+      if (error) throw new Error(`Opportunity costs sync failed: ${error.message}`);
+    }
+
+    // 5. Sync Documents
+    if (db.documents.length > 0) {
+      const { error } = await supabase.from('opportunity_documents').upsert(db.documents, { onConflict: 'id' });
+      if (error) throw new Error(`Opportunity documents sync failed: ${error.message}`);
+    }
+
+    // 6. Sync Payment Terms
+    if (db.payment_terms.length > 0) {
+      const { error } = await supabase.from('payment_terms').upsert(db.payment_terms, { onConflict: 'id' });
+      if (error) throw new Error(`Payment terms sync failed: ${error.message}`);
+    }
+
+    // 7. Sync Verification Items
+    if (db.verification_items.length > 0) {
+      const { error } = await supabase.from('verification_items').upsert(db.verification_items, { onConflict: 'id' });
+      if (error) throw new Error(`Verification items sync failed: ${error.message}`);
+    }
+
+    // 8. Sync Follow-ups
+    if (db.follow_ups.length > 0) {
+      const { error } = await supabase.from('follow_ups').upsert(db.follow_ups, { onConflict: 'id' });
+      if (error) throw new Error(`Follow-ups sync failed: ${error.message}`);
+    }
+
+    return {
+      success: true,
+      message: `Successfully synchronized ${db.agencies.length} agencies, ${db.visits.length} visits, and ${db.opportunities.length} opportunities to Supabase!`,
+      counts: {
+        agencies: db.agencies.length,
+        visits: db.visits.length,
+        opportunities: db.opportunities.length
+      }
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Sync operation failed'
+    };
+  }
 }
 
 // DEMO DATA CONTROLS

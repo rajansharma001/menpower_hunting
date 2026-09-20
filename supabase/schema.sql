@@ -1,52 +1,16 @@
 -- ==============================================================================
 -- Foreign Employment / Manpower Research - Nepal
--- Supabase PostgreSQL Relational Schema with Row Level Security (RLS)
+-- Supabase PostgreSQL Relational Schema
+-- Supports both authenticated researcher accounts and direct anon key access
 -- ==============================================================================
 
 -- Enable UUID extension
 create extension if not exists "uuid-ossp";
 
--- 1. PROFILES TABLE
-create table if not exists public.profiles (
-  id uuid references auth.users(id) on delete cascade primary key,
-  name text,
-  email text,
-  created_at timestamptz default now()
-);
-
-alter table public.profiles enable row level security;
-
-create policy "Users can view own profile"
-  on public.profiles for select
-  using (auth.uid() = id);
-
-create policy "Users can update own profile"
-  on public.profiles for update
-  using (auth.uid() = id);
-
-create policy "Users can insert own profile"
-  on public.profiles for insert
-  with check (auth.uid() = id);
-
--- Profile trigger on auth.users creation
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, name, email)
-  values (new.id, coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)), new.email);
-  return new;
-end;
-$$ language plpgsql security definer;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-
--- 2. AGENCIES TABLE
+-- 1. AGENCIES TABLE
 create table if not exists public.agencies (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
+  user_id text default 'default_user',
   name text not null,
   location text,
   phone text,
@@ -59,20 +23,30 @@ create table if not exists public.agencies (
   updated_at timestamptz default now()
 );
 
+alter table if exists public.agencies alter column user_id drop not null;
+alter table if exists public.agencies alter column user_id type text using user_id::text;
+alter table if exists public.agencies drop constraint if exists agencies_user_id_fkey;
+
 alter table public.agencies enable row level security;
 
-create policy "Users can CRUD own agencies"
+-- Policy: Allow read & write with anon/publishable key and authenticated accounts
+drop policy if exists "Users can view their own agencies" on public.agencies;
+drop policy if exists "Users can insert their own agencies" on public.agencies;
+drop policy if exists "Users can update their own agencies" on public.agencies;
+drop policy if exists "Users can delete their own agencies" on public.agencies;
+drop policy if exists "Allow all access to agencies" on public.agencies;
+create policy "Allow all access to agencies"
   on public.agencies for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (true)
+  with check (true);
 
 create index if not exists idx_agencies_user_id on public.agencies(user_id);
 create index if not exists idx_agencies_name on public.agencies(name);
 
--- 3. VISITS TABLE
+-- 2. VISITS TABLE
 create table if not exists public.visits (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
+  user_id text default 'default_user',
   agency_id uuid references public.agencies(id) on delete cascade not null,
   visit_date date default current_date not null,
   discovery_channel text,
@@ -81,21 +55,30 @@ create table if not exists public.visits (
   updated_at timestamptz default now()
 );
 
+alter table if exists public.visits alter column user_id drop not null;
+alter table if exists public.visits alter column user_id type text using user_id::text;
+alter table if exists public.visits drop constraint if exists visits_user_id_fkey;
+
 alter table public.visits enable row level security;
 
-create policy "Users can CRUD own visits"
+drop policy if exists "Users can view their own visits" on public.visits;
+drop policy if exists "Users can insert their own visits" on public.visits;
+drop policy if exists "Users can update their own visits" on public.visits;
+drop policy if exists "Users can delete their own visits" on public.visits;
+drop policy if exists "Allow all access to visits" on public.visits;
+create policy "Allow all access to visits"
   on public.visits for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (true)
+  with check (true);
 
 create index if not exists idx_visits_user_id on public.visits(user_id);
 create index if not exists idx_visits_agency_id on public.visits(agency_id);
 create index if not exists idx_visits_date on public.visits(visit_date desc);
 
--- 4. OPPORTUNITIES TABLE
+-- 3. OPPORTUNITIES TABLE
 create table if not exists public.opportunities (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
+  user_id text default 'default_user',
   agency_id uuid references public.agencies(id) on delete cascade not null,
   visit_id uuid references public.visits(id) on delete cascade not null,
   country text not null,
@@ -131,12 +114,21 @@ create table if not exists public.opportunities (
   updated_at timestamptz default now()
 );
 
+alter table if exists public.opportunities alter column user_id drop not null;
+alter table if exists public.opportunities alter column user_id type text using user_id::text;
+alter table if exists public.opportunities drop constraint if exists opportunities_user_id_fkey;
+
 alter table public.opportunities enable row level security;
 
-create policy "Users can CRUD own opportunities"
+drop policy if exists "Users can view their own opportunities" on public.opportunities;
+drop policy if exists "Users can insert their own opportunities" on public.opportunities;
+drop policy if exists "Users can update their own opportunities" on public.opportunities;
+drop policy if exists "Users can delete their own opportunities" on public.opportunities;
+drop policy if exists "Allow all access to opportunities" on public.opportunities;
+create policy "Allow all access to opportunities"
   on public.opportunities for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (true)
+  with check (true);
 
 create index if not exists idx_opportunities_user_id on public.opportunities(user_id);
 create index if not exists idx_opportunities_agency_id on public.opportunities(agency_id);
@@ -145,7 +137,7 @@ create index if not exists idx_opportunities_country on public.opportunities(cou
 create index if not exists idx_opportunities_job_sector on public.opportunities(job_sector);
 create index if not exists idx_opportunities_evidence_status on public.opportunities(evidence_status);
 
--- 5. OPPORTUNITY_COSTS TABLE
+-- 4. OPPORTUNITY_COSTS TABLE
 create table if not exists public.opportunity_costs (
   id uuid default gen_random_uuid() primary key,
   opportunity_id uuid references public.opportunities(id) on delete cascade not null unique,
@@ -168,31 +160,24 @@ create table if not exists public.opportunity_costs (
 
 alter table public.opportunity_costs enable row level security;
 
-create policy "Users can CRUD own opportunity costs"
+drop policy if exists "Users can view their own opportunity_costs" on public.opportunity_costs;
+drop policy if exists "Users can insert their own opportunity_costs" on public.opportunity_costs;
+drop policy if exists "Users can update their own opportunity_costs" on public.opportunity_costs;
+drop policy if exists "Users can delete their own opportunity_costs" on public.opportunity_costs;
+drop policy if exists "Allow all access to opportunity_costs" on public.opportunity_costs;
+create policy "Allow all access to opportunity_costs"
   on public.opportunity_costs for all
-  using (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = opportunity_costs.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = opportunity_costs.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  );
+  using (true)
+  with check (true);
 
 create index if not exists idx_opportunity_costs_opp_id on public.opportunity_costs(opportunity_id);
 
--- 6. OPPORTUNITY_DOCUMENTS TABLE
+-- 5. OPPORTUNITY_DOCUMENTS TABLE
 create table if not exists public.opportunity_documents (
   id uuid default gen_random_uuid() primary key,
   opportunity_id uuid references public.opportunities(id) on delete cascade not null,
   document_type text not null,
-  shown boolean default true,
+  shown boolean default false,
   photo_allowed text default 'Not Asked',
   file_url text,
   notes text,
@@ -201,26 +186,19 @@ create table if not exists public.opportunity_documents (
 
 alter table public.opportunity_documents enable row level security;
 
-create policy "Users can CRUD own opportunity documents"
+drop policy if exists "Users can view their own opportunity_documents" on public.opportunity_documents;
+drop policy if exists "Users can insert their own opportunity_documents" on public.opportunity_documents;
+drop policy if exists "Users can update their own opportunity_documents" on public.opportunity_documents;
+drop policy if exists "Users can delete their own opportunity_documents" on public.opportunity_documents;
+drop policy if exists "Allow all access to opportunity_documents" on public.opportunity_documents;
+create policy "Allow all access to opportunity_documents"
   on public.opportunity_documents for all
-  using (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = opportunity_documents.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = opportunity_documents.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  );
+  using (true)
+  with check (true);
 
 create index if not exists idx_opportunity_docs_opp_id on public.opportunity_documents(opportunity_id);
 
--- 7. PAYMENT_TERMS TABLE
+-- 6. PAYMENT_TERMS TABLE
 create table if not exists public.payment_terms (
   id uuid default gen_random_uuid() primary key,
   opportunity_id uuid references public.opportunities(id) on delete cascade not null,
@@ -234,26 +212,19 @@ create table if not exists public.payment_terms (
 
 alter table public.payment_terms enable row level security;
 
-create policy "Users can CRUD own payment terms"
+drop policy if exists "Users can view their own payment_terms" on public.payment_terms;
+drop policy if exists "Users can insert their own payment_terms" on public.payment_terms;
+drop policy if exists "Users can update their own payment_terms" on public.payment_terms;
+drop policy if exists "Users can delete their own payment_terms" on public.payment_terms;
+drop policy if exists "Allow all access to payment_terms" on public.payment_terms;
+create policy "Allow all access to payment_terms"
   on public.payment_terms for all
-  using (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = payment_terms.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = payment_terms.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  );
+  using (true)
+  with check (true);
 
 create index if not exists idx_payment_terms_opp_id on public.payment_terms(opportunity_id);
 
--- 8. VERIFICATION_ITEMS TABLE
+-- 7. VERIFICATION_ITEMS TABLE
 create table if not exists public.verification_items (
   id uuid default gen_random_uuid() primary key,
   opportunity_id uuid references public.opportunities(id) on delete cascade not null,
@@ -267,30 +238,23 @@ create table if not exists public.verification_items (
 
 alter table public.verification_items enable row level security;
 
-create policy "Users can CRUD own verification items"
+drop policy if exists "Users can view their own verification_items" on public.verification_items;
+drop policy if exists "Users can insert their own verification_items" on public.verification_items;
+drop policy if exists "Users can update their own verification_items" on public.verification_items;
+drop policy if exists "Users can delete their own verification_items" on public.verification_items;
+drop policy if exists "Allow all access to verification_items" on public.verification_items;
+create policy "Allow all access to verification_items"
   on public.verification_items for all
-  using (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = verification_items.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.opportunities opp
-      where opp.id = verification_items.opportunity_id
-      and opp.user_id = auth.uid()
-    )
-  );
+  using (true)
+  with check (true);
 
 create index if not exists idx_verification_items_opp_id on public.verification_items(opportunity_id);
 create index if not exists idx_verification_items_status on public.verification_items(status);
 
--- 9. FOLLOW_UPS TABLE
+-- 8. FOLLOW_UPS TABLE
 create table if not exists public.follow_ups (
   id uuid default gen_random_uuid() primary key,
-  user_id uuid references auth.users(id) on delete cascade not null,
+  user_id text default 'default_user',
   opportunity_id uuid references public.opportunities(id) on delete cascade not null,
   follow_up_date date not null,
   action text not null,
@@ -299,19 +263,28 @@ create table if not exists public.follow_ups (
   created_at timestamptz default now()
 );
 
+alter table if exists public.follow_ups alter column user_id drop not null;
+alter table if exists public.follow_ups alter column user_id type text using user_id::text;
+alter table if exists public.follow_ups drop constraint if exists follow_ups_user_id_fkey;
+
 alter table public.follow_ups enable row level security;
 
-create policy "Users can CRUD own follow ups"
+drop policy if exists "Users can view their own follow_ups" on public.follow_ups;
+drop policy if exists "Users can insert their own follow_ups" on public.follow_ups;
+drop policy if exists "Users can update their own follow_ups" on public.follow_ups;
+drop policy if exists "Users can delete their own follow_ups" on public.follow_ups;
+drop policy if exists "Allow all access to follow_ups" on public.follow_ups;
+create policy "Allow all access to follow_ups"
   on public.follow_ups for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (true)
+  with check (true);
 
 create index if not exists idx_follow_ups_user_id on public.follow_ups(user_id);
 create index if not exists idx_follow_ups_opp_id on public.follow_ups(opportunity_id);
 create index if not exists idx_follow_ups_status on public.follow_ups(status);
 create index if not exists idx_follow_ups_date on public.follow_ups(follow_up_date);
 
--- Auto-update timestamp function
+-- Auto-update timestamp triggers
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -320,7 +293,14 @@ begin
 end;
 $$ language plpgsql;
 
+drop trigger if exists update_agencies_modtime on public.agencies;
 create trigger update_agencies_modtime before update on public.agencies for each row execute function public.set_updated_at();
+
+drop trigger if exists update_visits_modtime on public.visits;
 create trigger update_visits_modtime before update on public.visits for each row execute function public.set_updated_at();
+
+drop trigger if exists update_opportunities_modtime on public.opportunities;
 create trigger update_opportunities_modtime before update on public.opportunities for each row execute function public.set_updated_at();
+
+drop trigger if exists update_opportunity_costs_modtime on public.opportunity_costs;
 create trigger update_opportunity_costs_modtime before update on public.opportunity_costs for each row execute function public.set_updated_at();

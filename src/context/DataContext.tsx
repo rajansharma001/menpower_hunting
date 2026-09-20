@@ -41,6 +41,7 @@ interface DataContextType {
   resetDemoData: () => void;
   purgeDemoData: () => void;
   purgeAllData: () => void;
+  syncToSupabase: () => Promise<{ success: boolean; message: string; counts?: any }>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -64,6 +65,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hideToast = useCallback(() => {
     setToast(prev => ({ ...prev, visible: false }));
   }, []);
+
+  useEffect(() => {
+    const handleMphToast = (e: any) => {
+      if (e?.detail?.message) {
+        showToast(e.detail.message, e.detail.type || 'info');
+      }
+    };
+    window.addEventListener('mph-toast', handleMphToast);
+    return () => window.removeEventListener('mph-toast', handleMphToast);
+  }, [showToast]);
 
   const refreshData = useCallback(async () => {
     if (!user) return;
@@ -182,6 +193,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('All records cleared from file.', 'warning');
   };
 
+  const syncToSupabase = async () => {
+    setLoading(true);
+    const res = await db.syncAllLocalDataToSupabase();
+    await refreshData();
+    setLoading(false);
+    if (res.success) {
+      showToast(res.message, 'success');
+    } else {
+      showToast(res.message, 'error');
+    }
+    return res;
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -207,6 +231,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetDemoData,
         purgeDemoData,
         purgeAllData,
+        syncToSupabase,
       }}
     >
       {children}
