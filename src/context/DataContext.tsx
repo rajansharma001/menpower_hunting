@@ -6,7 +6,9 @@ import {
   Visit,
   VerificationItem,
   VerificationStatus,
-  FollowUpStatus
+  FollowUpStatus,
+  VisaMilestone,
+  VisaDocumentCheck
 } from '../types/database';
 import { WizardFormData } from '../types/form';
 import { useAuth } from './AuthContext';
@@ -35,6 +37,9 @@ interface DataContextType {
   removeAgency: (id: string) => Promise<boolean>;
   updateVerification: (id: string, updates: Partial<VerificationItem>) => Promise<void>;
   addVerification: (opportunityId: string, item: string, notes?: string) => Promise<void>;
+  updateMilestone: (opportunityId: string, milestoneId: string, updates: Partial<VisaMilestone>) => Promise<void>;
+  toggleVisaDoc: (opportunityId: string, docId: string) => Promise<void>;
+  updateVisaDoc: (opportunityId: string, docId: string, updates: Partial<VisaDocumentCheck>) => Promise<void>;
   saveFollowUp: (data: Omit<FollowUp, 'id' | 'created_at'>) => Promise<FollowUp>;
   editFollowUp: (id: string, updates: Partial<FollowUp>) => Promise<void>;
   removeFollowUp: (id: string) => Promise<void>;
@@ -153,6 +158,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     showToast('Verification checklist item added.', 'success');
   };
 
+  const updateMilestone = async (
+    opportunityId: string,
+    milestoneId: string,
+    updates: Partial<VisaMilestone>
+  ) => {
+    await db.updateVisaMilestone(opportunityId, milestoneId, updates);
+    await refreshData();
+    showToast('Visa milestone updated.', 'success');
+  };
+
+  const toggleVisaDoc = async (opportunityId: string, docId: string) => {
+    await db.toggleVisaDocument(opportunityId, docId);
+    await refreshData();
+    showToast('Document status updated.', 'info');
+  };
+
+  const updateVisaDoc = async (
+    opportunityId: string,
+    docId: string,
+    updates: Partial<VisaDocumentCheck>
+  ) => {
+    await db.updateVisaDocument(opportunityId, docId, updates);
+    await refreshData();
+    showToast('Document note updated.', 'success');
+  };
+
   const saveFollowUp = async (data: Omit<FollowUp, 'id' | 'created_at'>) => {
     const created = await db.createFollowUp(data);
     await refreshData();
@@ -225,6 +256,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         removeAgency,
         updateVerification,
         addVerification,
+        updateMilestone,
+        toggleVisaDoc,
+        updateVisaDoc,
         saveFollowUp,
         editFollowUp,
         removeFollowUp,

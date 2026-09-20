@@ -36,6 +36,7 @@ import { VoiceMemo } from '../types/database';
 import { getVoiceMemosByOpportunity, deleteVoiceMemo } from '../lib/audioDb';
 import { VoiceMemoPlayer } from '../components/audio/VoiceMemoPlayer';
 import { AudioRecorderModal } from '../components/audio/AudioRecorderModal';
+import { VisaTrackerSection } from '../components/visa/VisaTrackerSection';
 
 export const OpportunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -762,6 +763,9 @@ export const OpportunityDetailPage: React.FC = () => {
               </p>
             </div>
           </div>
+
+          {/* 4. Embassy Visa Process & VFS Appointment Tracker (युरोप VFS र गल्फ भिसा प्रगति ट्र्याकर) */}
+          <VisaTrackerSection opportunity={opp} />
 
           {/* Payment Terms & Schedule Details */}
           {(opp.payment_terms && opp.payment_terms.length > 0) && (

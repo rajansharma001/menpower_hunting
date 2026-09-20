@@ -22,12 +22,14 @@ import {
 } from 'lucide-react';
 import { calculatePaybackAnalysis, convertToNpr, formatNpr } from '../lib/currency';
 import { evaluateSafetyScore } from '../lib/safety';
+import { calculateVisaProgress, getCountryCorridor } from '../lib/visaProcess';
 
 export const OpportunitiesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { opportunities, agencies, followUps } = useData();
 
   // Filters
+  const [selectedCorridor, setSelectedCorridor] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(searchParams.get('country') || '');
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
@@ -49,6 +51,7 @@ export const OpportunitiesPage: React.FC = () => {
 
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter(o => {
+      if (selectedCorridor && getCountryCorridor(o.country) !== selectedCorridor) return false;
       if (selectedCountry && o.country !== selectedCountry) return false;
       if (selectedSector && o.job_sector !== selectedSector) return false;
       if (selectedCurrency && o.salary_currency !== selectedCurrency) return false;
@@ -103,6 +106,7 @@ export const OpportunitiesPage: React.FC = () => {
     });
   }, [
     opportunities,
+    selectedCorridor,
     selectedCountry,
     selectedSector,
     selectedCurrency,
@@ -119,6 +123,7 @@ export const OpportunitiesPage: React.FC = () => {
   ]);
 
   const handleResetFilters = () => {
+    setSelectedCorridor('');
     setSelectedCountry('');
     setSelectedSector('');
     setSelectedCurrency('');
@@ -134,6 +139,7 @@ export const OpportunitiesPage: React.FC = () => {
   };
 
   const hasActiveFilters =
+    selectedCorridor ||
     selectedCountry ||
     selectedSector ||
     selectedCurrency ||
@@ -195,7 +201,22 @@ export const OpportunitiesPage: React.FC = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-11 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-2">
+          {/* Corridor Filter */}
+          <div>
+            <label className="block text-2xs font-medium text-slate-500 mb-1">Corridor</label>
+            <select
+              value={selectedCorridor}
+              onChange={e => setSelectedCorridor(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none font-medium"
+            >
+              <option value="">All Corridors</option>
+              <option value="Europe">🇪🇺 Europe (VFS)</option>
+              <option value="Gulf">🇸🇦 Gulf (GAMCA)</option>
+              <option value="Other">🌐 Other</option>
+            </select>
+          </div>
+
           {/* Country */}
           <div>
             <label className="block text-2xs font-medium text-slate-500 mb-1">Country</label>
@@ -395,13 +416,14 @@ export const OpportunitiesPage: React.FC = () => {
                 <th className="py-2.5 px-3 border-r border-slate-200">Processing</th>
                 <th className="py-2.5 px-3 border-r border-slate-200">Safety & Threat</th>
                 <th className="py-2.5 px-3 border-r border-slate-200">Evidence</th>
+                <th className="py-2.5 px-3 border-r border-slate-200 whitespace-nowrap">Visa Progress</th>
                 <th className="py-2.5 px-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredOpportunities.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-10 text-center text-slate-500">
+                  <td colSpan={15} className="py-10 text-center text-slate-500">
                     <p className="mb-2">No opportunities found {hasActiveFilters ? 'matching selected filters' : 'recorded yet'}.</p>
                     <div className="flex justify-center gap-2 pt-1">
                       {hasActiveFilters && (
@@ -556,6 +578,33 @@ export const OpportunitiesPage: React.FC = () => {
                         <Badge status={opp.evidence_status} size="sm">
                           {opp.evidence_status || 'Needs Verification'}
                         </Badge>
+                      </td>
+                      <td className="py-2.5 px-3 border-r border-slate-100 whitespace-nowrap">
+                        {(() => {
+                          const milestones = opp.visa_milestones || [];
+                          const { completedCount, totalCount, percent } = calculateVisaProgress(milestones);
+                          const corridor = getCountryCorridor(opp.country);
+                          return (
+                            <div className="space-y-1">
+                              <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded inline-block ${
+                                corridor === 'Europe' ? 'bg-blue-100 text-blue-800' :
+                                corridor === 'Gulf' ? 'bg-emerald-100 text-emerald-800' :
+                                'bg-slate-100 text-slate-600'
+                              }`}>
+                                {corridor === 'Europe' ? '🇪🇺 EU' : corridor === 'Gulf' ? '🇸🇦 Gulf' : '🌐'}
+                              </span>
+                              <div className="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${percent === 100 ? 'bg-emerald-500' : 'bg-teal-600'}`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                {completedCount}/{totalCount} steps ({percent}%)
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
                         <Link
@@ -726,6 +775,33 @@ export const OpportunitiesPage: React.FC = () => {
                         <span>{mobileSafety.criticalBanners[0]}</span>
                       </div>
                     )}
+
+                    {/* Visa Process Progress — EU/Gulf Corridor */}
+                    {(() => {
+                      const milestones = opp.visa_milestones || [];
+                      const { completedCount, totalCount, percent } = calculateVisaProgress(milestones);
+                      const corridor = getCountryCorridor(opp.country);
+                      if (totalCount === 0) return null;
+                      return (
+                        <div className="p-2.5 bg-teal-50/50 border border-teal-200/80 rounded-lg space-y-1.5">
+                          <div className="flex items-center justify-between text-2xs">
+                            <span className="font-semibold text-teal-900 flex items-center gap-1">
+                              {corridor === 'Europe' ? '🇪🇺' : corridor === 'Gulf' ? '🇸🇦' : '🌐'}
+                              {corridor} Visa Process
+                            </span>
+                            <span className="font-mono text-teal-800 font-bold">
+                              {completedCount}/{totalCount} steps ({percent}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${percent === 100 ? 'bg-emerald-500' : 'bg-teal-600'}`}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
                       <Link

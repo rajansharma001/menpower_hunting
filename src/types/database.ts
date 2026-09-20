@@ -166,6 +166,34 @@ export interface VoiceMemo {
   notes?: string;
 }
 
+export type VisaMilestoneStatus = 'Pending' | 'In Progress' | 'Completed' | 'Delayed';
+
+export interface VisaMilestone {
+  id: string;
+  opportunity_id: string;
+  step_number: number;
+  title: string;
+  title_np: string;
+  category: 'dofe' | 'interview' | 'permit' | 'police' | 'vfs' | 'embassy' | 'final_labour' | 'flight' | 'medical' | 'e_visa';
+  status: VisaMilestoneStatus;
+  target_date?: string;
+  completed_date?: string;
+  reference_number?: string;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface VisaDocumentCheck {
+  id: string;
+  opportunity_id: string;
+  name: string;
+  name_np: string;
+  required_for: 'EU' | 'Gulf' | 'Both';
+  is_ready: boolean;
+  notes?: string;
+}
+
 export interface OpportunityComplete extends Opportunity {
   agency?: Agency;
   visit?: Visit;
@@ -175,5 +203,8 @@ export interface OpportunityComplete extends Opportunity {
   verification_items?: VerificationItem[];
   follow_ups?: FollowUp[];
   voice_memos?: VoiceMemo[];
+  visa_milestones?: VisaMilestone[];
+  visa_documents?: VisaDocumentCheck[];
 }
+
 

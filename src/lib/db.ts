@@ -8,11 +8,14 @@ import {
   VerificationItem,
   FollowUp,
   OpportunityComplete,
+  VisaMilestone,
+  VisaDocumentCheck
 } from '../types/database';
 import { WizardFormData } from '../types/form';
 import { getSupabase } from './supabase';
 import { generateDemoData } from './demoData';
 import { DEFAULT_VERIFICATION_ITEMS } from '../constants/workflowOptions';
+import { generateDefaultMilestones, generateDefaultDocuments } from './visaProcess';
 
 export interface FileDatabase {
   agencies: Agency[];
@@ -23,6 +26,8 @@ export interface FileDatabase {
   payment_terms: PaymentTerm[];
   verification_items: VerificationItem[];
   follow_ups: FollowUp[];
+  visa_milestones?: VisaMilestone[];
+  visa_documents?: VisaDocumentCheck[];
 }
 
 let cachedDb: FileDatabase = {
@@ -33,7 +38,9 @@ let cachedDb: FileDatabase = {
   documents: [],
   payment_terms: [],
   verification_items: [],
-  follow_ups: []
+  follow_ups: [],
+  visa_milestones: [],
+  visa_documents: []
 };
 
 let isLoadedFromFile = false;
@@ -66,7 +73,9 @@ export async function fetchFileDatabase(): Promise<FileDatabase> {
         documents: Array.isArray(data.documents) ? data.documents : [],
         payment_terms: Array.isArray(data.payment_terms) ? data.payment_terms : [],
         verification_items: Array.isArray(data.verification_items) ? data.verification_items : [],
-        follow_ups: Array.isArray(data.follow_ups) ? data.follow_ups : []
+        follow_ups: Array.isArray(data.follow_ups) ? data.follow_ups : [],
+        visa_milestones: Array.isArray(data.visa_milestones) ? data.visa_milestones : [],
+        visa_documents: Array.isArray(data.visa_documents) ? data.visa_documents : []
       };
       isLoadedFromFile = true;
       try {
@@ -91,7 +100,9 @@ export async function fetchFileDatabase(): Promise<FileDatabase> {
         documents: Array.isArray(parsed.documents) ? parsed.documents : [],
         payment_terms: Array.isArray(parsed.payment_terms) ? parsed.payment_terms : [],
         verification_items: Array.isArray(parsed.verification_items) ? parsed.verification_items : [],
-        follow_ups: Array.isArray(parsed.follow_ups) ? parsed.follow_ups : []
+        follow_ups: Array.isArray(parsed.follow_ups) ? parsed.follow_ups : [],
+        visa_milestones: Array.isArray(parsed.visa_milestones) ? parsed.visa_milestones : [],
+        visa_documents: Array.isArray(parsed.visa_documents) ? parsed.visa_documents : []
       };
       isLoadedFromFile = true;
       return cachedDb;
@@ -321,10 +332,20 @@ export async function getOpportunities(userId: string): Promise<OpportunityCompl
         .order('created_at', { ascending: false });
 
       if (!error && opps) {
-        return opps.map((o: any) => ({
-          ...o,
-          costs: Array.isArray(o.costs) ? o.costs[0] : o.costs,
-        })) as OpportunityComplete[];
+        return opps.map((o: any) => {
+          const milestones = (o.visa_milestones && o.visa_milestones.length > 0)
+            ? o.visa_milestones
+            : generateDefaultMilestones(o.id, o.country);
+          const documents = (o.visa_documents && o.visa_documents.length > 0)
+            ? o.visa_documents
+            : generateDefaultDocuments(o.id, o.country);
+          return {
+            ...o,
+            costs: Array.isArray(o.costs) ? o.costs[0] : o.costs,
+            visa_milestones: milestones,
+            visa_documents: documents,
+          };
+        }) as OpportunityComplete[];
       }
     } catch (err) {
       console.warn('Falling back to file database for getOpportunities', err);
@@ -334,16 +355,25 @@ export async function getOpportunities(userId: string): Promise<OpportunityCompl
   const db = await ensureDataLoaded();
   const opps = db.opportunities.filter(o => !userId || o.user_id === userId);
 
-  return opps.map(opp => ({
-    ...opp,
-    agency: db.agencies.find(a => a.id === opp.agency_id),
-    visit: db.visits.find(v => v.id === opp.visit_id),
-    costs: db.costs.find(c => c.opportunity_id === opp.id),
-    documents: db.documents.filter(d => d.opportunity_id === opp.id),
-    payment_terms: db.payment_terms.filter(p => p.opportunity_id === opp.id),
-    verification_items: db.verification_items.filter(v => v.opportunity_id === opp.id),
-    follow_ups: db.follow_ups.filter(f => f.opportunity_id === opp.id)
-  }));
+  return opps.map(opp => {
+    const oppMilestones = (db.visa_milestones || []).filter(m => m.opportunity_id === opp.id);
+    const milestones = oppMilestones.length > 0 ? oppMilestones : generateDefaultMilestones(opp.id, opp.country);
+    const oppDocs = (db.visa_documents || []).filter(d => d.opportunity_id === opp.id);
+    const documents = oppDocs.length > 0 ? oppDocs : generateDefaultDocuments(opp.id, opp.country);
+
+    return {
+      ...opp,
+      agency: db.agencies.find(a => a.id === opp.agency_id),
+      visit: db.visits.find(v => v.id === opp.visit_id),
+      costs: db.costs.find(c => c.opportunity_id === opp.id),
+      documents: db.documents.filter(d => d.opportunity_id === opp.id),
+      payment_terms: db.payment_terms.filter(p => p.opportunity_id === opp.id),
+      verification_items: db.verification_items.filter(v => v.opportunity_id === opp.id),
+      follow_ups: db.follow_ups.filter(f => f.opportunity_id === opp.id),
+      visa_milestones: milestones,
+      visa_documents: documents
+    };
+  });
 }
 
 export async function getOpportunity(id: string): Promise<OpportunityComplete | null> {
@@ -369,6 +399,8 @@ export async function deleteOpportunity(id: string): Promise<boolean> {
   db.payment_terms = db.payment_terms.filter(p => p.opportunity_id !== id);
   db.verification_items = db.verification_items.filter(v => v.opportunity_id !== id);
   db.follow_ups = db.follow_ups.filter(f => f.opportunity_id !== id);
+  db.visa_milestones = (db.visa_milestones || []).filter(m => m.opportunity_id !== id);
+  db.visa_documents = (db.visa_documents || []).filter(d => d.opportunity_id !== id);
   await saveToFileDisk(db);
   return true;
 }
@@ -898,6 +930,8 @@ export async function clearDemoData(userId: string) {
   db.payment_terms = db.payment_terms.filter(p => !demoOppIds.has(p.opportunity_id));
   db.verification_items = db.verification_items.filter(v => !demoOppIds.has(v.opportunity_id));
   db.follow_ups = db.follow_ups.filter(f => !demoOppIds.has(f.opportunity_id));
+  db.visa_milestones = (db.visa_milestones || []).filter(m => !demoOppIds.has(m.opportunity_id));
+  db.visa_documents = (db.visa_documents || []).filter(d => !demoOppIds.has(d.opportunity_id));
 
   await saveToFileDisk(db);
 }
@@ -911,8 +945,106 @@ export async function clearAllData(userId?: string) {
     documents: [],
     payment_terms: [],
     verification_items: [],
-    follow_ups: []
+    follow_ups: [],
+    visa_milestones: [],
+    visa_documents: []
   };
   await saveToFileDisk(emptyDb);
   localStorage.removeItem('mph_wizard_draft_v1');
 }
+
+// VISA MILESTONES & DOCUMENT CHECKLIST HANDLERS
+export async function updateVisaMilestone(
+  opportunityId: string,
+  milestoneId: string,
+  updates: Partial<VisaMilestone>
+): Promise<VisaMilestone | null> {
+  const db = await ensureDataLoaded();
+  if (!db.visa_milestones) {
+    db.visa_milestones = [];
+  }
+
+  // Ensure default milestones exist if not yet materialized
+  const oppMilestones = db.visa_milestones.filter(m => m.opportunity_id === opportunityId);
+  if (oppMilestones.length === 0) {
+    const opp = db.opportunities.find(o => o.id === opportunityId);
+    if (opp) {
+      const defaults = generateDefaultMilestones(opp.id, opp.country);
+      db.visa_milestones.push(...defaults);
+    }
+  }
+
+  const idx = db.visa_milestones.findIndex(m => m.id === milestoneId);
+  if (idx !== -1) {
+    db.visa_milestones[idx] = {
+      ...db.visa_milestones[idx],
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    await saveToFileDisk(db);
+    return db.visa_milestones[idx];
+  }
+  return null;
+}
+
+export async function toggleVisaDocument(
+  opportunityId: string,
+  docId: string
+): Promise<VisaDocumentCheck | null> {
+  const db = await ensureDataLoaded();
+  if (!db.visa_documents) {
+    db.visa_documents = [];
+  }
+
+  const oppDocs = db.visa_documents.filter(d => d.opportunity_id === opportunityId);
+  if (oppDocs.length === 0) {
+    const opp = db.opportunities.find(o => o.id === opportunityId);
+    if (opp) {
+      const defaults = generateDefaultDocuments(opp.id, opp.country);
+      db.visa_documents.push(...defaults);
+    }
+  }
+
+  const idx = db.visa_documents.findIndex(d => d.id === docId);
+  if (idx !== -1) {
+    db.visa_documents[idx] = {
+      ...db.visa_documents[idx],
+      is_ready: !db.visa_documents[idx].is_ready
+    };
+    await saveToFileDisk(db);
+    return db.visa_documents[idx];
+  }
+  return null;
+}
+
+export async function updateVisaDocument(
+  opportunityId: string,
+  docId: string,
+  updates: Partial<VisaDocumentCheck>
+): Promise<VisaDocumentCheck | null> {
+  const db = await ensureDataLoaded();
+  if (!db.visa_documents) {
+    db.visa_documents = [];
+  }
+
+  const oppDocs = db.visa_documents.filter(d => d.opportunity_id === opportunityId);
+  if (oppDocs.length === 0) {
+    const opp = db.opportunities.find(o => o.id === opportunityId);
+    if (opp) {
+      const defaults = generateDefaultDocuments(opp.id, opp.country);
+      db.visa_documents.push(...defaults);
+    }
+  }
+
+  const idx = db.visa_documents.findIndex(d => d.id === docId);
+  if (idx !== -1) {
+    db.visa_documents[idx] = {
+      ...db.visa_documents[idx],
+      ...updates
+    };
+    await saveToFileDisk(db);
+    return db.visa_documents[idx];
+  }
+  return null;
+}
+
