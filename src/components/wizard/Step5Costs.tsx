@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { WizardFormData } from '../../types/form';
 import { CostBreakdownStatus } from '../../types/database';
 import { auditLegalRecruitmentCost, isFreeVisaRegulatedCountry } from '../../lib/dofe';
-import { Banknote, ChevronDown, ChevronUp, Calculator, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Banknote, ChevronDown, ChevronUp, Calculator, ShieldAlert, CheckCircle2, Clock } from 'lucide-react';
+import { calculatePaybackAnalysis, formatNpr } from '../../lib/currency';
 
 interface Step5Props {
   formData: WizardFormData;
@@ -27,6 +28,16 @@ export const Step5Costs: React.FC<Step5Props> = ({ formData, onChange }) => {
 
   const quotedTotal = parseFloat(formData.total_quoted_cost || '0') || 0;
   const unaccountedDifference = quotedTotal - itemizedTotal;
+
+  const netSalaryNum = parseFloat(formData.expected_net_salary || formData.advertised_salary || '0') || 0;
+  const accomCostNum = parseFloat(formData.accommodation_cost || '0') || 0;
+  const payback = calculatePaybackAnalysis(
+    quotedTotal,
+    netSalaryNum,
+    formData.salary_currency || 'EUR',
+    formData.country || '',
+    formData.accommodation_type === 'Worker Pays' || formData.accommodation_type === 'Salary Deduction' ? accomCostNum : 0
+  );
 
   const costFields: { field: keyof WizardFormData; label: string; placeholder: string }[] = [
     { field: 'agency_service_charge', label: 'Agency Service Charge', placeholder: 'e.g. 350000' },
@@ -87,6 +98,36 @@ export const Step5Costs: React.FC<Step5Props> = ({ formData, onChange }) => {
                   auditLegalRecruitmentCost(formData.country, quotedTotal, formData.free_visa_free_ticket).successMessage}
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Break-Even Payback Period Preview */}
+        {quotedTotal > 0 && netSalaryNum > 0 && (
+          <div className="mt-2.5 p-3 rounded-md border bg-slate-50 border-slate-200 space-y-1.5 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-2xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-teal-700" />
+                <span>Investment Payback (लागत असुली महिना)</span>
+              </span>
+              <span className={`text-2xs font-bold px-2 py-0.5 rounded border ${payback.riskBadgeColor}`}>
+                {payback.riskBadgeLabel}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-2xs text-slate-700 pt-1">
+              <div>
+                <span className="text-slate-500 block">Est. Monthly Take-home:</span>
+                <span className="font-bold text-slate-900">{formatNpr(payback.monthlyNetNpr)} / mo</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Labor to Break Even:</span>
+                <span className="font-bold text-slate-900">~{payback.paybackMonthsFormatted} Working Months</span>
+              </div>
+            </div>
+
+            <p className="text-2xs text-slate-600 leading-relaxed pt-1.5 border-t border-slate-200">
+              {payback.debtAdvice}
+            </p>
           </div>
         )}
       </div>

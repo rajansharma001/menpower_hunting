@@ -4,6 +4,7 @@ import { COUNTRIES } from '../../constants/countries';
 import { JOB_SECTORS } from '../../constants/jobSectors';
 import { Globe2, Briefcase, Building, MapPin } from 'lucide-react';
 import { EmployerIdentified, IntermediaryType } from '../../types/database';
+import { getDefaultCurrencyForCountry } from '../../lib/currency';
 
 interface Step2Props {
   formData: WizardFormData;
@@ -22,7 +23,13 @@ export const Step2Opportunity: React.FC<Step2Props> = ({ formData, onChange }) =
         <select
           required
           value={formData.country}
-          onChange={e => onChange('country', e.target.value)}
+          onChange={e => {
+            const selected = e.target.value;
+            onChange('country', selected);
+            const defaultCurr = getDefaultCurrencyForCountry(selected);
+            onChange('salary_currency', defaultCurr);
+            onChange('net_salary_currency', defaultCurr);
+          }}
           className="w-full bg-white border border-slate-300 rounded px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-1 focus:ring-teal-600 font-medium"
         >
           <option value="" disabled>-- Select Destination Country --</option>

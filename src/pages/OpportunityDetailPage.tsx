@@ -29,6 +29,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { auditLegalRecruitmentCost, getDofePortalUrl } from '../lib/dofe';
+import { calculatePaybackAnalysis, convertToNpr, formatNpr, NRB_BENCHMARK_RATES } from '../lib/currency';
 
 export const OpportunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -119,6 +120,19 @@ export const OpportunityDetailPage: React.FC = () => {
     opp.country,
     quotedTotal,
     opp.free_visa_free_ticket
+  );
+
+  const netForeignSalary = opp.expected_net_salary || opp.advertised_salary || 0;
+  const accomCostForeign =
+    opp.accommodation_type === 'Worker Pays' || opp.accommodation_type === 'Salary Deduction'
+      ? opp.accommodation_cost || 0
+      : 0;
+  const paybackAnalysis = calculatePaybackAnalysis(
+    quotedTotal,
+    netForeignSalary,
+    opp.net_salary_currency || opp.salary_currency || 'EUR',
+    opp.country,
+    accomCostForeign
   );
 
   return (
@@ -235,6 +249,11 @@ export const OpportunityDetailPage: React.FC = () => {
                     ? `${opp.advertised_salary.toLocaleString()} ${opp.salary_currency}`
                     : '—'}
                 </span>
+                {opp.advertised_salary && opp.salary_currency !== 'NPR' && (
+                  <span className="text-2xs text-teal-800 font-semibold block">
+                    ≈ {formatNpr(convertToNpr(opp.advertised_salary, opp.salary_currency))} / mo
+                  </span>
+                )}
                 <span className="text-2xs text-slate-500 block">Type: {opp.salary_type || 'Unclear'}</span>
               </div>
 
@@ -242,9 +261,14 @@ export const OpportunityDetailPage: React.FC = () => {
                 <span className="text-2xs text-slate-400 block">Expected Net Take-Home</span>
                 <span className="font-bold text-teal-800 text-sm">
                   {opp.expected_net_salary
-                    ? `${opp.expected_net_salary.toLocaleString()} ${opp.net_salary_currency}`
+                    ? `${opp.expected_net_salary.toLocaleString()} ${opp.net_salary_currency || opp.salary_currency}`
                     : '—'}
                 </span>
+                {opp.expected_net_salary && (opp.net_salary_currency || opp.salary_currency) !== 'NPR' && (
+                  <span className="text-2xs text-emerald-800 font-semibold block">
+                    ≈ {formatNpr(convertToNpr(opp.expected_net_salary, opp.net_salary_currency || opp.salary_currency))} / mo in Nepal
+                  </span>
+                )}
                 <span className="text-2xs text-slate-500 block">After taxes & living costs</span>
               </div>
 
@@ -362,6 +386,74 @@ export const OpportunityDetailPage: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Break-Even Payback Period & Debt Risk Analysis Widget */}
+            <div className="p-3.5 rounded-md border bg-slate-50/90 border-slate-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 border-b border-slate-200/80 pb-2">
+                <div className="flex items-center space-x-1.5">
+                  <Clock className="w-4 h-4 text-teal-700" />
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Break-Even Payback & Debt Analysis (लागत असुली अवधि)
+                  </span>
+                </div>
+                <span className={`text-2xs font-bold px-2 py-0.5 rounded border self-start sm:self-auto ${paybackAnalysis.riskBadgeColor}`}>
+                  {paybackAnalysis.riskBadgeLabel}
+                </span>
+              </div>
+
+              {/* Grid with core numbers */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <span className="text-2xs text-slate-500 block">Total Quoted Cost</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {formatNpr(paybackAnalysis.totalCostNpr)}
+                  </span>
+                </div>
+
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <span className="text-2xs text-slate-500 block">Net Monthly Take-home</span>
+                  <span className="font-bold text-teal-800 text-sm">
+                    {formatNpr(paybackAnalysis.monthlyNetNpr)}
+                  </span>
+                  <span className="text-2xs text-slate-400 block">
+                    (~{opp.net_salary_currency || opp.salary_currency} {paybackAnalysis.monthlyNetForeign.toLocaleString()})
+                  </span>
+                </div>
+
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <span className="text-2xs text-slate-500 block">Labor to Break Even</span>
+                  <span className="font-bold text-slate-900 text-sm">
+                    {paybackAnalysis.paybackMonthsFormatted} Months
+                  </span>
+                  <span className="text-2xs text-slate-400 block">
+                    {paybackAnalysis.corridor} Corridor
+                  </span>
+                </div>
+
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <span className="text-2xs text-slate-500 block">2-Year Net Savings</span>
+                  <span className="font-bold text-emerald-800 text-sm">
+                    {formatNpr(paybackAnalysis.twoYearContractSavingsNpr)}
+                  </span>
+                  <span className="text-2xs text-slate-400 block">After paying costs</span>
+                </div>
+              </div>
+
+              {/* Contextual debt & loan advisory */}
+              <div className="p-2.5 bg-white rounded border border-slate-200 text-2xs space-y-1">
+                <span className="font-bold text-slate-800 block">
+                  Financial Feasibility & Loan Risk Advisory ({paybackAnalysis.corridor}):
+                </span>
+                <p className="text-slate-700 leading-relaxed">
+                  {paybackAnalysis.debtAdvice}
+                </p>
+                {paybackAnalysis.totalCostNpr > 300000 && (
+                  <p className="text-slate-500 pt-0.5 italic">
+                    Note: If financing this cost with an informal loan in Nepal (typically 24%–36% per annum), interest alone equals ~NPR {Math.round((paybackAnalysis.totalCostNpr * 0.28) / 12).toLocaleString()} per month.
+                  </p>
+                )}
+              </div>
+            </div>
 
             {/* Individual Itemized Costs Table */}
             {c && (

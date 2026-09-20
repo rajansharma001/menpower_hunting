@@ -3,6 +3,7 @@ import { WizardFormData } from '../../types/form';
 import { CURRENCIES } from '../../constants/currencies';
 import { SalaryType, OvertimeStatus } from '../../types/database';
 import { DollarSign, Clock, Calendar, Shield } from 'lucide-react';
+import { convertToNpr, formatNpr, NRB_BENCHMARK_RATES } from '../../lib/currency';
 
 interface Step3Props {
   formData: WizardFormData;
@@ -10,6 +11,11 @@ interface Step3Props {
 }
 
 export const Step3Salary: React.FC<Step3Props> = ({ formData, onChange }) => {
+  const advSalaryNum = parseFloat(formData.advertised_salary) || 0;
+  const netSalaryNum = parseFloat(formData.expected_net_salary) || 0;
+  const currCode = formData.salary_currency || 'EUR';
+  const currRate = NRB_BENCHMARK_RATES[currCode] || 1;
+
   return (
     <div className="space-y-4">
       {/* Salary & Currency */}
@@ -32,6 +38,14 @@ export const Step3Salary: React.FC<Step3Props> = ({ formData, onChange }) => {
               value={formData.advertised_salary}
               onChange={e => onChange('advertised_salary', e.target.value)}
             />
+            {advSalaryNum > 0 && currCode !== 'NPR' && (
+              <div className="mt-1.5 text-2xs text-teal-900 font-semibold bg-teal-50 border border-teal-200 rounded px-2 py-0.5 inline-flex items-center gap-1">
+                <span>≈ {formatNpr(convertToNpr(advSalaryNum, currCode))} / month</span>
+                <span className="text-slate-500 font-normal">
+                  (1 {currCode} = NPR {currRate})
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -50,7 +64,7 @@ export const Step3Salary: React.FC<Step3Props> = ({ formData, onChange }) => {
             >
               {CURRENCIES.map(curr => (
                 <option key={curr.code} value={curr.code}>
-                  {curr.code} ({curr.symbol})
+                  {curr.code} ({curr.symbol}) {curr.region ? `[${curr.region}]` : ''}
                 </option>
               ))}
             </select>
@@ -81,7 +95,7 @@ export const Step3Salary: React.FC<Step3Props> = ({ formData, onChange }) => {
         </div>
 
         {/* Expected Net Salary */}
-        <div className="pt-2 border-t border-slate-100">
+        <div className="pt-2 border-t border-slate-100 space-y-1">
           <label className="block text-xs font-medium text-slate-700 mb-1">
             Expected Net Take-home Pay (after tax & deductions)
           </label>
@@ -98,6 +112,11 @@ export const Step3Salary: React.FC<Step3Props> = ({ formData, onChange }) => {
               {formData.salary_currency}
             </div>
           </div>
+          {netSalaryNum > 0 && currCode !== 'NPR' && (
+            <div className="text-2xs text-emerald-900 font-semibold bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5 inline-flex items-center gap-1">
+              <span>≈ {formatNpr(convertToNpr(netSalaryNum, currCode))} / month Net Remittance Potential</span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -15,8 +15,10 @@ import {
   Briefcase,
   Building2,
   MapPin,
-  Eye
+  Eye,
+  Clock
 } from 'lucide-react';
+import { calculatePaybackAnalysis, convertToNpr, formatNpr } from '../lib/currency';
 
 export const OpportunitiesPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,7 +40,7 @@ export const OpportunitiesPage: React.FC = () => {
   const [expandedMobileRowId, setExpandedMobileRowId] = useState<string | null>(null);
 
   // Sorting
-  const [sortField, setSortField] = useState<'created_at' | 'cost' | 'net_salary'>('created_at');
+  const [sortField, setSortField] = useState<'created_at' | 'cost' | 'net_salary' | 'payback'>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const filteredOpportunities = useMemo(() => {
@@ -66,6 +68,19 @@ export const OpportunitiesPage: React.FC = () => {
         const salA = a.expected_net_salary || a.advertised_salary || 0;
         const salB = b.expected_net_salary || b.advertised_salary || 0;
         return sortDirection === 'asc' ? salA - salB : salB - salA;
+      }
+      if (sortField === 'payback') {
+        const getPaybackMonths = (opp: typeof a) => {
+          const cost = opp.costs?.total_quoted_cost || 0;
+          const netSal = opp.expected_net_salary || opp.advertised_salary || 0;
+          const monthlyNpr = convertToNpr(netSal, opp.net_salary_currency || opp.salary_currency || 'EUR');
+          if (cost === 0) return 0;
+          if (monthlyNpr <= 0) return 999;
+          return cost / monthlyNpr;
+        };
+        const pA = getPaybackMonths(a);
+        const pB = getPaybackMonths(b);
+        return sortDirection === 'asc' ? pA - pB : pB - pA;
       }
       return sortDirection === 'asc'
         ? new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -309,6 +324,7 @@ export const OpportunitiesPage: React.FC = () => {
               className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none font-medium"
             >
               <option value="created_at-desc">Newest First</option>
+              <option value="payback-asc">Payback: Quickest Break-Even</option>
               <option value="cost-asc">Cost: Low to High</option>
               <option value="cost-desc">Cost: High to Low</option>
               <option value="net_salary-desc">Highest Net Pay</option>
@@ -385,6 +401,13 @@ export const OpportunitiesPage: React.FC = () => {
                     : 0;
                   const quotedCost = opp.costs?.total_quoted_cost || 0;
                   const diff = quotedCost - itemizedSum;
+                  const netSal = opp.expected_net_salary || opp.advertised_salary || 0;
+                  const payback = calculatePaybackAnalysis(
+                    quotedCost,
+                    netSal,
+                    opp.net_salary_currency || opp.salary_currency || 'EUR',
+                    opp.country
+                  );
 
                   return (
                     <tr key={opp.id} className="hover:bg-slate-50/90 transition">
@@ -423,14 +446,29 @@ export const OpportunitiesPage: React.FC = () => {
                           : '—'}
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-teal-800 border-r border-slate-100 whitespace-nowrap">
-                        {opp.expected_net_salary
-                          ? `${opp.expected_net_salary.toLocaleString()} ${opp.net_salary_currency}`
-                          : '—'}
+                        <div>
+                          {opp.expected_net_salary
+                            ? `${opp.expected_net_salary.toLocaleString()} ${opp.net_salary_currency || opp.salary_currency}`
+                            : '—'}
+                        </div>
+                        {opp.expected_net_salary && (opp.net_salary_currency || opp.salary_currency) !== 'NPR' && (
+                          <div className="text-2xs text-slate-500 font-normal">
+                            ≈ {formatNpr(convertToNpr(opp.expected_net_salary, opp.net_salary_currency || opp.salary_currency))}
+                          </div>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 border-r border-slate-100 whitespace-nowrap">
                         <div className="font-bold text-slate-900">
                           NPR {quotedCost.toLocaleString()}
                         </div>
+                        {netSal > 0 && (
+                          <div
+                            className={`text-2xs font-semibold px-1.5 py-0.5 rounded border inline-block mt-0.5 ${payback.riskBadgeColor}`}
+                            title={`Recovers cost in ~${payback.paybackMonthsFormatted} months (${payback.corridor} corridor)`}
+                          >
+                            ⏱️ {payback.paybackMonthsFormatted} mo payback
+                          </div>
+                        )}
                         {diff > 0 && (
                           <div className="text-2xs text-slate-500" title="Unaccounted Difference">
                             Diff: NPR {diff.toLocaleString()}
@@ -492,6 +530,13 @@ export const OpportunitiesPage: React.FC = () => {
           filteredOpportunities.map(opp => {
             const isExpanded = expandedMobileRowId === opp.id;
             const quotedCost = opp.costs?.total_quoted_cost || 0;
+            const mobileNetSal = opp.expected_net_salary || opp.advertised_salary || 0;
+            const mobilePayback = calculatePaybackAnalysis(
+              quotedCost,
+              mobileNetSal,
+              opp.net_salary_currency || opp.salary_currency || 'EUR',
+              opp.country
+            );
 
             return (
               <div
@@ -524,6 +569,11 @@ export const OpportunitiesPage: React.FC = () => {
                       {opp.expected_net_salary && (
                         <span className="text-2xs text-slate-600">
                           (Net: {opp.expected_net_salary} {opp.net_salary_currency})
+                        </span>
+                      )}
+                      {mobileNetSal > 0 && (
+                        <span className={`text-2xs font-bold px-1.5 py-0.5 rounded border ${mobilePayback.riskBadgeColor}`}>
+                          ⏱️ {mobilePayback.paybackMonthsFormatted} mo
                         </span>
                       )}
                       {opp.dofe_lot_number && (
@@ -569,6 +619,18 @@ export const OpportunitiesPage: React.FC = () => {
                       <div>
                         <span className="text-slate-400 block">Food:</span>
                         <span className="font-medium text-slate-800">{opp.food_arrangement}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Payback Period:</span>
+                        <span className="font-bold text-slate-900">
+                          {mobilePayback.paybackMonthsFormatted} mo ({mobilePayback.corridor})
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block">Est. Net Take-home:</span>
+                        <span className="font-bold text-teal-800">
+                          {formatNpr(mobilePayback.monthlyNetNpr)} / mo
+                        </span>
                       </div>
                       <div>
                         <span className="text-slate-400 block">Processing Time:</span>
